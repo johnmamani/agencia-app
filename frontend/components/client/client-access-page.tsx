@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { authenticateClient, registerClient } from "@/frontend/lib/client-indexeddb";
 import { getActiveProfile } from "@/frontend/lib/profile-indexeddb";
 import {
+  ADMIN_EMAIL,
+  ADMIN_PASSWORD,
+  DEMO_ADMIN_EMAIL,
+  DEMO_ADMIN_PASSWORD,
   clearSession,
   isAdminCredential,
   readSession,
@@ -43,11 +47,12 @@ export function ClientAccessPage() {
       const [activeProfile, persistedSession] = await Promise.all([getActiveProfile(), Promise.resolve(readSession())]);
       setProfile(activeProfile);
       setSession(persistedSession);
-      setLoading(false);
 
       if (persistedSession?.role === "admin") {
-        router.replace("/admin");
+        setActiveTab("admin");
       }
+
+      setLoading(false);
     }
 
     void loadInitial();
@@ -112,7 +117,7 @@ export function ClientAccessPage() {
     }
 
     if (isAdminCredential(normalizedEmail, normalizedPassword)) {
-      const adminSession = saveAdminSession();
+      const adminSession = saveAdminSession(normalizedEmail);
       setSession(adminSession);
       setMessage("Acceso de administrador concedido. Redirigiendo al panel...");
       setLoginForm({ email: "", password: "" });
@@ -161,7 +166,7 @@ export function ClientAccessPage() {
       return;
     }
 
-    const adminSession = saveAdminSession();
+    const adminSession = saveAdminSession(normalizedEmail);
     setSession(adminSession);
     setAdminForm({ email: "", password: "" });
     setMessage("Acceso de administrador concedido. Redirigiendo al panel...");
@@ -176,10 +181,17 @@ export function ClientAccessPage() {
   }
 
   function useDemoCredentials() {
-    setActiveTab("login");
+    setActiveTab("admin");
     setError("");
-    setMessage("Credenciales demo cargadas. Ahora pulsa Ingresar.");
-    setLoginForm({ email: "demo@agenciaaurora.com", password: "Demo1234" });
+    setMessage("Credenciales demo admin cargadas. Ahora pulsa Ingresar como admin.");
+    setAdminForm({ email: DEMO_ADMIN_EMAIL, password: DEMO_ADMIN_PASSWORD });
+  }
+
+  function useAdminCredentials() {
+    setActiveTab("admin");
+    setError("");
+    setMessage("Credenciales de admin cargadas. Ahora pulsa Ingresar como admin.");
+    setAdminForm({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
   }
 
   if (loading) {
@@ -273,8 +285,18 @@ export function ClientAccessPage() {
             >
               Usar cuenta demo
             </button>
+            <button
+              type="button"
+              onClick={useAdminCredentials}
+              className="rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20 transition"
+            >
+              Usar admin
+            </button>
             <span className="rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-xs text-white/70">
-              demo@agenciaaurora.com / Demo1234
+              {DEMO_ADMIN_EMAIL} / {DEMO_ADMIN_PASSWORD}
+            </span>
+            <span className="rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-xs text-white/70">
+              {ADMIN_EMAIL} / {ADMIN_PASSWORD}
             </span>
           </div>
 
@@ -383,12 +405,15 @@ export function ClientAccessPage() {
             </form>
           ) : (
             <form className="mt-6 grid gap-3" onSubmit={handleAdminLogin}>
+              <p className="text-xs text-white/60">
+                Acceso admin por defecto: {ADMIN_EMAIL}
+              </p>
               <label className="grid gap-2 text-sm text-white/85">
                 Correo admin
                 <input
                   value={adminForm.email}
                   onChange={(event) => setAdminForm((prev) => ({ ...prev, email: event.target.value }))}
-                  placeholder="admin@agenciaaurora.com"
+                  placeholder={ADMIN_EMAIL}
                   type="email"
                   className="rounded-xl border border-white/20 bg-black/20 px-4 py-3"
                   required

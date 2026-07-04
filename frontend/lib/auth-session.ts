@@ -10,8 +10,12 @@ export type AuthSession = {
   role: UserRole;
 };
 
-const ADMIN_EMAIL = "admin@agenciaaurora.com";
-const ADMIN_PASSWORD = "Admin1234";
+export const ADMIN_EMAIL =
+  process.env.NEXT_PUBLIC_ADMIN_EMAIL?.trim().toLowerCase() || "admin@agenciaaurora.com";
+export const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD?.trim() || "Admin1234";
+export const DEMO_ADMIN_EMAIL =
+  process.env.NEXT_PUBLIC_DEMO_ADMIN_EMAIL?.trim().toLowerCase() || "demo@agenciaaurora.com";
+export const DEMO_ADMIN_PASSWORD = process.env.NEXT_PUBLIC_DEMO_ADMIN_PASSWORD?.trim() || "Demo1234";
 const ADMIN_FULL_NAME = "Administrador Agencia";
 
 function normalizeEmail(email: string): string {
@@ -19,7 +23,15 @@ function normalizeEmail(email: string): string {
 }
 
 export function isAdminCredential(email: string, password: string): boolean {
-  return normalizeEmail(email) === ADMIN_EMAIL && password.trim() === ADMIN_PASSWORD;
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedPassword = password.trim();
+
+  const isPrimaryAdmin =
+    normalizedEmail === normalizeEmail(ADMIN_EMAIL) && normalizedPassword === ADMIN_PASSWORD;
+  const isDemoAdmin =
+    normalizedEmail === normalizeEmail(DEMO_ADMIN_EMAIL) && normalizedPassword === DEMO_ADMIN_PASSWORD;
+
+  return isPrimaryAdmin || isDemoAdmin;
 }
 
 export function readSession(): AuthSession | null {
@@ -60,9 +72,10 @@ export function saveClientSession(client: Client): void {
   );
 }
 
-export function saveAdminSession(): AuthSession {
+export function saveAdminSession(email?: string): AuthSession {
+  const normalizedEmail = email ? normalizeEmail(email) : ADMIN_EMAIL;
   const session: AuthSession = {
-    email: ADMIN_EMAIL,
+    email: normalizedEmail,
     fullName: ADMIN_FULL_NAME,
     role: "admin",
   };

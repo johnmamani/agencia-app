@@ -2,6 +2,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { FormEvent, ChangeEvent, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 
 import {
   createProfile,
@@ -92,9 +93,6 @@ export function AdminDashboard() {
   const [editPickerId, setEditPickerId] = useState<string>("");
   const [selectedId, setSelectedId] = useState<string>("");
   const [editingId, setEditingId] = useState<string>("");
-  const [quickLocation, setQuickLocation] = useState("");
-  const [quickServiceType, setQuickServiceType] = useState("");
-  const [quickCost, setQuickCost] = useState("");
   const [loading, setLoading] = useState(false);
   const [clientLoading, setClientLoading] = useState(false);
   const [message, setMessage] = useState<string>("");
@@ -136,22 +134,6 @@ export function AdminDashboard() {
     void fetchProfiles();
     void fetchClients();
   }, [fetchProfiles, fetchClients]);
-
-  function handleProfileSelection(profileId: string) {
-    setSelectedId(profileId);
-    const profile = profiles.find((item) => item.id === profileId);
-
-    if (!profile) {
-      setQuickLocation("");
-      setQuickServiceType("");
-      setQuickCost("");
-      return;
-    }
-
-    setQuickLocation(profile.locationText);
-    setQuickServiceType(profile.serviceTypeText);
-    setQuickCost(profile.costText);
-  }
 
   function loadProfileIntoForm(profileId: string) {
     const profile = profiles.find((item) => item.id === profileId);
@@ -274,9 +256,6 @@ export function AdminDashboard() {
 
     if (selectedId === id) {
       setSelectedId("");
-      setQuickLocation("");
-      setQuickServiceType("");
-      setQuickCost("");
     }
 
     setMessage("Perfil eliminado.");
@@ -335,18 +314,16 @@ export function AdminDashboard() {
     setMessage("");
 
     const photoUrls: string[] = [];
+    const skipped: string[] = [];
 
     for (let i = 0; i < Math.min(files.length, 10); i++) {
       const file = files[i];
-      if (!file.type.startsWith("image/")) {
-        continue;
-      }
-
       try {
         const dataUrl = await fileToDataUrl(file);
         photoUrls.push(dataUrl);
       } catch (err) {
         console.error("Error reading file:", err);
+        skipped.push(file.name);
       }
     }
 
@@ -357,9 +334,13 @@ export function AdminDashboard() {
         : photoUrls.join("\n");
 
       setForm((prev) => ({ ...prev, photosText: newPhotosText }));
-      setMessage(`${photoUrls.length} foto(s) agregada(s)`);
+      setMessage(
+        skipped.length > 0
+          ? `${photoUrls.length} foto(s) agregada(s). No se pudieron leer: ${skipped.join(", ")}`
+          : `${photoUrls.length} foto(s) agregada(s)`,
+      );
     } else {
-      setError("No se detectaron imagenes validas.");
+      setError("No se pudieron leer los archivos seleccionados.");
     }
 
     event.currentTarget.value = "";
@@ -376,18 +357,16 @@ export function AdminDashboard() {
     setMessage("");
 
     const videoUrls: string[] = [];
+    const skippedVideos: string[] = [];
 
     for (let i = 0; i < Math.min(files.length, 2); i++) {
       const file = files[i];
-      if (!file.type.startsWith("video/")) {
-        continue;
-      }
-
       try {
         const dataUrl = await fileToDataUrl(file);
         videoUrls.push(dataUrl);
       } catch (err) {
         console.error("Error reading file:", err);
+        skippedVideos.push(file.name);
       }
     }
 
@@ -398,9 +377,13 @@ export function AdminDashboard() {
         : videoUrls.join("\n");
 
       setForm((prev) => ({ ...prev, videosText: newVideosText }));
-      setMessage(`${videoUrls.length} video(s) agregado(s)`);
+      setMessage(
+        skippedVideos.length > 0
+          ? `${videoUrls.length} video(s) agregado(s). No se pudieron leer: ${skippedVideos.join(", ")}`
+          : `${videoUrls.length} video(s) agregado(s)`,
+      );
     } else {
-      setError("No se detectaron videos validos.");
+      setError("No se pudieron leer los archivos seleccionados.");
     }
 
     event.currentTarget.value = "";
@@ -462,40 +445,12 @@ export function AdminDashboard() {
       await resetProfiles();
       resetForm();
       setSelectedId("");
-      setQuickLocation("");
-      setQuickServiceType("");
-      setQuickCost("");
       setConfirmReset(false);
       await fetchProfiles();
       setMessage("Base local reiniciada correctamente.");
     } catch (error) {
       setError(error instanceof Error ? error.message : "No se pudo reiniciar la base.");
     }
-  }
-
-  async function handleQuickUpdate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    setMessage("");
-
-    if (!selectedId) {
-      setError("Selecciona un perfil para actualizar.");
-      return;
-    }
-
-    try {
-      await updateProfile(selectedId, {
-        locationText: quickLocation,
-        serviceTypeText: quickServiceType,
-        costText: quickCost,
-      });
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "No se pudo actualizar publicidad.");
-      return;
-    }
-
-    setMessage("Publicidad actualizada correctamente.");
-    await fetchProfiles();
   }
 
   return (
@@ -599,8 +554,33 @@ export function AdminDashboard() {
       {/* ── TAB: PERFILES ── */}
       {activeTab === "perfiles" && (
         <>
-          <section className="mt-6 grid gap-6 lg:grid-cols-2">
-        <article className="rounded-3xl border border-white/20 bg-white/8 p-6 backdrop-blur-sm">
+          <section className="mt-6">
+            <div className="mx-auto mb-4 flex w-full max-w-3xl flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/15 bg-black/20 px-4 py-3">
+              <div>
+                <p className="text-xs font-semibold tracking-[0.14em] uppercase text-white/60">
+                  Vista previa y navegación
+                </p>
+                <p className="text-sm text-white/80">Revisa la landing pública o el acceso de cliente.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href="/"
+                  target="_blank"
+                  className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20 transition"
+                >
+                  Ver pantalla principal
+                </Link>
+                <Link
+                  href="/client"
+                  target="_blank"
+                  className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent-ink)] hover:brightness-110 transition"
+                >
+                  Ver pantalla cliente
+                </Link>
+              </div>
+            </div>
+
+        <article className="mx-auto w-full max-w-3xl rounded-3xl border border-white/20 bg-white/8 p-6 backdrop-blur-sm md:p-10">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="font-[var(--font-heading)] font-bold text-3xl">
@@ -811,62 +791,74 @@ export function AdminDashboard() {
             <div className="border-t border-white/10" />
 
             {/* Medios */}
-            <div className="grid gap-3">
+            <div className="grid gap-4">
               <div className="flex items-center justify-between">
-                <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-white/40">
-                  Medios
-                </p>
-                <p className="text-[11px] text-white/40">5 a 10 fotos · 1 a 2 videos</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-white/40">Medios</p>
+                <p className="text-[11px] text-white/40">5–10 fotos · 1–2 videos</p>
               </div>
-              <div className="grid gap-1.5">
-                <label className="text-xs font-semibold text-white/65">
-                  Fotos — URLs (una por linea)
-                </label>
-                <textarea
-                  value={form.photosText}
-                  onChange={(event) => setForm((prev) => ({ ...prev, photosText: event.target.value }))}
-                  placeholder="https://..."
-                  className="min-h-[88px] rounded-xl border border-white/20 bg-black/20 px-4 py-3 text-sm font-mono"
-                  required
-                />
+
+              {/* Fotos — entrada unificada */}
+              <div className="rounded-2xl border border-white/15 bg-black/20 p-4">
+                <p className="text-xs font-bold text-white/70 mb-3">📷 Fotos</p>
+                <div className="grid gap-3">
+                  <div className="grid gap-1.5">
+                    <label className="text-xs font-semibold text-white/55">Pega URLs (una por línea)</label>
+                    <textarea
+                      value={form.photosText}
+                      onChange={(event) => setForm((prev) => ({ ...prev, photosText: event.target.value }))}
+                      placeholder="https://ejemplo.com/foto1.jpg&#10;https://ejemplo.com/foto2.jpg"
+                      className="min-h-[80px] rounded-xl border border-white/20 bg-black/20 px-4 py-3 text-sm font-mono"
+                      required
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="h-px flex-1 bg-white/10" />
+                    <span className="text-xs text-white/35">o sube desde tu dispositivo</span>
+                    <div className="h-px flex-1 bg-white/10" />
+                  </div>
+                  <div className="grid gap-1">
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*,.heic,.heif,.avif,.bmp,.tiff,.tif,.webp,.jpg,.jpeg,.png,.gif,.svg"
+                      onChange={(event) => void handlePhotoUpload(event)}
+                      className="block w-full cursor-pointer rounded-xl border border-dashed border-white/25 bg-white/5 px-4 py-3 text-sm text-white/60 file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-[var(--accent)] file:px-3 file:py-1 file:text-xs file:font-bold file:text-[var(--accent-ink)]"
+                    />
+                    <p className="text-xs text-white/35">JPG, PNG, WebP, HEIC y más · máx. 10 fotos</p>
+                  </div>
+                </div>
               </div>
-              <div className="grid gap-1.5">
-                <label className="text-xs font-semibold text-white/65">
-                  O sube fotos desde tu dispositivo
-                </label>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={(event) => void handlePhotoUpload(event)}
-                  className="block w-full rounded-xl border border-white/20 bg-black/20 px-4 py-3 text-sm text-white/65"
-                />
-                <p className="text-xs text-white/40">Max 10 fotos, soporta JPG, PNG, WebP</p>
-              </div>
-              <div className="grid gap-1.5">
-                <label className="text-xs font-semibold text-white/65">
-                  Videos — URLs (una por linea)
-                </label>
-                <textarea
-                  value={form.videosText}
-                  onChange={(event) => setForm((prev) => ({ ...prev, videosText: event.target.value }))}
-                  placeholder="https://..."
-                  className="min-h-[72px] rounded-xl border border-white/20 bg-black/20 px-4 py-3 text-sm font-mono"
-                  required
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <label className="text-xs font-semibold text-white/65">
-                  O sube videos desde tu dispositivo
-                </label>
-                <input
-                  type="file"
-                  multiple
-                  accept="video/*"
-                  onChange={(event) => void handleVideoUpload(event)}
-                  className="block w-full rounded-xl border border-white/20 bg-black/20 px-4 py-3 text-sm text-white/65"
-                />
-                <p className="text-xs text-white/40">Max 2 videos, tamano sin limite local</p>
+
+              {/* Videos — entrada unificada */}
+              <div className="rounded-2xl border border-white/15 bg-black/20 p-4">
+                <p className="text-xs font-bold text-white/70 mb-3">🎬 Videos</p>
+                <div className="grid gap-3">
+                  <div className="grid gap-1.5">
+                    <label className="text-xs font-semibold text-white/55">Pega URLs (una por línea)</label>
+                    <textarea
+                      value={form.videosText}
+                      onChange={(event) => setForm((prev) => ({ ...prev, videosText: event.target.value }))}
+                      placeholder="https://ejemplo.com/video1.mp4"
+                      className="min-h-[64px] rounded-xl border border-white/20 bg-black/20 px-4 py-3 text-sm font-mono"
+                      required
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="h-px flex-1 bg-white/10" />
+                    <span className="text-xs text-white/35">o sube desde tu dispositivo</span>
+                    <div className="h-px flex-1 bg-white/10" />
+                  </div>
+                  <div className="grid gap-1">
+                    <input
+                      type="file"
+                      multiple
+                      accept="video/*"
+                      onChange={(event) => void handleVideoUpload(event)}
+                      className="block w-full cursor-pointer rounded-xl border border-dashed border-white/25 bg-white/5 px-4 py-3 text-sm text-white/60 file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-[var(--accent)] file:px-3 file:py-1 file:text-xs file:font-bold file:text-[var(--accent-ink)]"
+                    />
+                    <p className="text-xs text-white/35">Link directo, YouTube o archivo local · máx. 2 videos</p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -893,85 +885,24 @@ export function AdminDashboard() {
 
             <button
               type="submit"
-              className="rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-bold text-[var(--accent-ink)]"
+              className="w-full rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-bold text-[var(--accent-ink)] hover:brightness-110 transition"
             >
               {editingId ? "Guardar cambios" : "Guardar perfil nuevo"}
             </button>
+
+            {message ? (
+              <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3">
+                <p className="text-sm text-emerald-300">{message}</p>
+              </div>
+            ) : null}
+            {error ? (
+              <div className="rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3">
+                <p className="text-sm text-rose-300">{error}</p>
+              </div>
+            ) : null}
           </form>
         </article>
 
-        <article className="rounded-3xl border border-white/20 bg-white/8 p-6 backdrop-blur-sm">
-          <h2 className="font-[var(--font-heading)] font-bold text-3xl">Actualizacion rapida</h2>
-          <p className="mt-2 text-sm text-white/65">
-            Cambia solo ubicacion, tipo de servicio y costo de cualquier perfil sin cargar el
-            formulario completo.
-          </p>
-
-          <form className="mt-6 grid gap-4" onSubmit={handleQuickUpdate}>
-            <div className="grid gap-1.5">
-              <label className="text-xs font-semibold text-white/65">Perfil a actualizar</label>
-              <select
-                value={selectedId}
-                onChange={(event) => handleProfileSelection(event.target.value)}
-                className="rounded-xl border border-white/20 bg-black/20 px-4 py-3 text-sm"
-              >
-                <option value="">Seleccionar perfil...</option>
-                {profiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>
-                    {profile.displayName}
-                    {profile.isVisible ? " (visible)" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid gap-1.5">
-              <label className="text-xs font-semibold text-white/65">Ubicacion</label>
-              <input
-                value={quickLocation}
-                onChange={(event) => setQuickLocation(event.target.value)}
-                placeholder="Ej: Miraflores, Barranco"
-                className="rounded-xl border border-white/20 bg-black/20 px-4 py-3 text-sm"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <label className="text-xs font-semibold text-white/65">Tipo de servicio</label>
-              <input
-                value={quickServiceType}
-                onChange={(event) => setQuickServiceType(event.target.value)}
-                placeholder="Ej: Night lounge, after office"
-                className="rounded-xl border border-white/20 bg-black/20 px-4 py-3 text-sm"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <label className="text-xs font-semibold text-white/65">Costo</label>
-              <input
-                value={quickCost}
-                onChange={(event) => setQuickCost(event.target.value)}
-                placeholder="Ej: Desde S/ 450 por 2 horas"
-                className="rounded-xl border border-white/20 bg-black/20 px-4 py-3 text-sm"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="rounded-full border border-white/25 bg-white/10 px-5 py-3 text-sm font-semibold"
-            >
-              Aplicar cambios
-            </button>
-          </form>
-
-          {message ? (
-            <div className="mt-5 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3">
-              <p className="text-sm text-emerald-300">{message}</p>
-            </div>
-          ) : null}
-          {error ? (
-            <div className="mt-5 rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3">
-              <p className="text-sm text-rose-300">{error}</p>
-            </div>
-          ) : null}
-        </article>
       </section>
 
       {/* Profiles list — inside perfiles tab */}

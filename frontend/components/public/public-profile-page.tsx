@@ -14,6 +14,44 @@ function whatsappHref(number: string): string {
   return `https://wa.me/${clean}?text=Hola%2C%20quiero%20informacion%20del%20perfil%20disponible`;
 }
 
+function getYouTubeEmbedUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, "").toLowerCase();
+
+    if (host === "youtu.be") {
+      const videoId = url.pathname.split("/").filter(Boolean)[0];
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+    }
+
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      const videoId = url.searchParams.get("v");
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+      }
+
+      if (url.pathname.startsWith("/embed/")) {
+        return value;
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function getVideoRenderer(value: string): { kind: "video" | "iframe"; src: string } {
+  const normalized = value.trim();
+  const youtubeEmbed = getYouTubeEmbedUrl(normalized);
+
+  if (youtubeEmbed) {
+    return { kind: "iframe", src: youtubeEmbed };
+  }
+
+  return { kind: "video", src: normalized };
+}
+
 function getFlagFromNationality(nationality: string): string {
   const value = nationality.trim().toLowerCase();
 
@@ -534,23 +572,50 @@ export function PublicProfilePage() {
       ) : null}
 
       {profile && profile.videos.length > 0 ? (
-        <section id="videos" className="mt-12 animate-fade-in-up">
-          <h2 className="font-[var(--font-heading)] font-bold text-5xl">🎬 Videos ({profile.videos.length})</h2>
+        <section id="videos" className="mx-auto mt-16 w-full max-w-7xl animate-fade-in-up">
+          <h2 className="font-[var(--font-heading)] font-bold text-5xl md:text-6xl">🎬 Videos ({profile.videos.length})</h2>
+          <p className="mt-2 text-sm text-white/65">
+            Se muestran enlaces directos de video y también enlaces de YouTube.
+          </p>
           
           {/* Grid de videos cuadrados con reproductor */}
-          <div className="mt-6 grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
+          <div className="mt-8 grid justify-items-center gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {profile.videos.map((video, idx) => (
               <article
                 key={idx}
-                className="relative rounded-2xl overflow-hidden border-2 border-white/25 bg-black/40 hover:border-white/50 transition group aspect-square shadow-lg hover:shadow-xl hover:shadow-[var(--accent)]/20"
+                className={`relative w-full overflow-hidden rounded-3xl border-2 border-white/25 bg-black/40 transition group shadow-lg hover:border-white/50 hover:shadow-xl hover:shadow-[var(--accent)]/20 ${
+                  idx === 0
+                    ? "max-w-5xl aspect-[4/3] sm:aspect-video lg:col-span-2 lg:row-span-2 lg:min-h-[34rem] xl:min-h-[36rem]"
+                    : idx === 1
+                      ? "max-w-3xl aspect-[4/3] sm:aspect-video lg:col-span-1 lg:min-h-[16rem]"
+                      : "max-w-3xl aspect-[4/3] sm:aspect-video lg:col-span-1 lg:min-h-[16rem] xl:aspect-[16/9]"
+                }`}
               >
                 {/* Video player */}
-                <video
-                  src={video}
-                  controls
-                  className="w-full h-full object-cover"
-                  preload="metadata"
-                />
+                {(() => {
+                  const player = getVideoRenderer(video);
+
+                  if (player.kind === "iframe") {
+                    return (
+                      <iframe
+                        src={player.src}
+                        title={`Video ${idx + 1} de ${profile.displayName}`}
+                        className="h-full w-full object-cover"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                      />
+                    );
+                  }
+
+                  return (
+                    <video
+                      src={player.src}
+                      controls
+                      className="h-full w-full object-cover"
+                      preload="metadata"
+                    />
+                  );
+                })()}
 
                 {/* Overlay con información */}
                 <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-3 opacity-0 group-hover:opacity-100 transition">
