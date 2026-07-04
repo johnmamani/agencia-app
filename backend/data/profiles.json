@@ -1,0 +1,29 @@
+{
+  "profiles": [
+    {
+      "id": "3e3aa2b2-b950-4b98-80c8-90013f20a8c4",
+      "displayName": "Aurora",
+      "tagline": "Modelo anfitriona para eventos premium",
+      "physicalTraits": "Estilo elegante, imagen editorial, presencia social.",
+      "serviceDetails": "Acompanamiento legal para cenas, eventos privados y actividades sociales.",
+      "treatmentStyle": "Trato cordial, puntual y con protocolo profesional.",
+      "costText": "Desde S/ 450 por bloque de 2 horas.",
+      "locationText": "Miraflores, San Isidro, Barranco.",
+      "serviceTypeText": "Night lounge, rooftop, after office VIP.",
+      "whatsappNumber": "51999999999",
+      "photos": [
+        "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1517365830460-955ce3ccd263?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1506869640319-fe1a24fd76dc?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "videos": [
+        "https://samplelib.com/lib/preview/mp4/sample-5s.mp4"
+      ],
+      "isVisible": true,
+      "createdAt": "2026-06-13T21:41:02.947Z",
+      "updatedAt": "2026-06-13T21:41:02.947Z"
+    }
+  ]
+}
