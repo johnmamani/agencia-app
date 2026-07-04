@@ -68,6 +68,19 @@ function parseLines(value: string): string[] {
     .filter(Boolean);
 }
 
+function isLikelyImageSource(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  if (normalized.startsWith("data:image/")) {
+    return true;
+  }
+
+  return /\.(jpg|jpeg|png|webp|gif|bmp|avif|heic|heif|svg)(\?|#|$)/.test(normalized);
+}
+
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -90,7 +103,7 @@ export function AdminDashboard() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
-  const [editPickerId, setEditPickerId] = useState<string>("");
+  const [showProfileForm, setShowProfileForm] = useState(false);
   const [selectedId, setSelectedId] = useState<string>("");
   const [editingId, setEditingId] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -105,6 +118,7 @@ export function AdminDashboard() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetPwdClientId, setResetPwdClientId] = useState<string>("");
   const [newPassword, setNewPassword] = useState<string>("");
+  const photoItems = parseLines(form.photosText);
 
   const fetchProfiles = useCallback(async () => {
     setLoading(true);
@@ -117,11 +131,8 @@ export function AdminDashboard() {
     }
     setRatingsByProfile(ratingMap);
 
-    if (data.length > 0 && !editPickerId) {
-      setEditPickerId(data[0].id);
-    }
     setLoading(false);
-  }, [editPickerId]);
+  }, []);
 
   const fetchClients = useCallback(async () => {
     setClientLoading(true);
@@ -143,7 +154,7 @@ export function AdminDashboard() {
     }
 
     setEditingId(profile.id);
-    setEditPickerId(profile.id);
+  setShowProfileForm(true);
     setForm({
       displayName: profile.displayName,
       age: String(profile.age),
@@ -166,6 +177,19 @@ export function AdminDashboard() {
   function resetForm() {
     setEditingId("");
     setForm(INITIAL_FORM);
+  }
+
+  function handleOpenCreateProfile() {
+    setError("");
+    setMessage("");
+    resetForm();
+    setShowProfileForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function handleCloseProfileForm() {
+    resetForm();
+    setShowProfileForm(false);
   }
 
   async function handleCreateProfile(event: FormEvent<HTMLFormElement>) {
@@ -210,18 +234,6 @@ export function AdminDashboard() {
       setMessage("Perfil actualizado correctamente.");
     }
     await fetchProfiles();
-  }
-
-  function handleLoadSelectedProfileForEdit() {
-    if (!editPickerId) {
-      setError("Selecciona un perfil para editar.");
-      return;
-    }
-
-    setError("");
-    setMessage("");
-    loadProfileIntoForm(editPickerId);
-    setMessage("Perfil cargado para edicion.");
   }
 
   async function handleVisibility(id: string, isVisible: boolean) {
@@ -346,6 +358,13 @@ export function AdminDashboard() {
     event.currentTarget.value = "";
   }
 
+  function handleRemovePhoto(index: number) {
+    const nextPhotos = photoItems.filter((_, currentIndex) => currentIndex !== index);
+    setForm((prev) => ({ ...prev, photosText: nextPhotos.join("\n") }));
+    setError("");
+    setMessage("Foto quitada de la lista.");
+  }
+
   async function handleVideoUpload(event: ChangeEvent<HTMLInputElement>) {
     const files = event.currentTarget.files;
 
@@ -456,9 +475,18 @@ export function AdminDashboard() {
   return (
     <main className="mx-auto w-full max-w-7xl px-6 py-10 md:px-10">
       <header className="rounded-3xl border border-white/20 bg-white/8 p-6 backdrop-blur-sm md:p-8">
-        <p className="text-xs font-semibold tracking-[0.14em] uppercase text-white/70">
-          Panel de Administracion
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs font-semibold tracking-[0.14em] uppercase text-white/70">
+            Panel de Administracion
+          </p>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20 transition"
+          >
+            <span aria-hidden>←</span>
+            Ir a pagina principal
+          </Link>
+        </div>
         <h1 className="mt-3 font-[var(--font-heading)] font-extrabold text-5xl">Mantenimiento</h1>
         <p className="mt-4 max-w-3xl text-white/85">
           Gestiona perfiles, clientes y la base de datos. Solo un perfil puede estar visible a la
@@ -554,6 +582,7 @@ export function AdminDashboard() {
       {/* ── TAB: PERFILES ── */}
       {activeTab === "perfiles" && (
         <>
+          {showProfileForm ? (
           <section className="mt-6">
             <div className="mx-auto mb-4 flex w-full max-w-3xl flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/15 bg-black/20 px-4 py-3">
               <div>
@@ -592,46 +621,15 @@ export function AdminDashboard() {
                 </p>
               ) : null}
             </div>
-            {editingId ? (
-              <button
-                type="button"
-                onClick={resetForm}
-                className="shrink-0 rounded-full border border-white/25 bg-white/10 px-4 py-2 text-xs font-semibold"
-              >
-                Cancelar
-              </button>
-            ) : null}
+            <button
+              type="button"
+              onClick={handleCloseProfileForm}
+              className="shrink-0 rounded-full border border-white/25 bg-white/10 px-4 py-2 text-xs font-semibold"
+            >
+              {editingId ? "Cancelar" : "Cerrar"}
+            </button>
           </div>
           <p className="mt-2 text-sm text-white/75">Fotos: 5 a 10</p>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <select
-              value={editPickerId}
-              onChange={(event) => setEditPickerId(event.target.value)}
-              className="flex-1 rounded-xl border border-white/20 bg-black/20 px-4 py-2.5 text-sm"
-            >
-              <option value="">Seleccionar perfil para editar...</option>
-              {profiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.displayName}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={handleLoadSelectedProfileForEdit}
-              className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent-ink)]"
-            >
-              Cargar
-            </button>
-            <button
-              type="button"
-              onClick={resetForm}
-              className="rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold"
-            >
-              Nuevo
-            </button>
-          </div>
 
           <form className="mt-6 grid gap-6" onSubmit={handleCreateProfile}>
             {/* Identidad */}
@@ -826,6 +824,47 @@ export function AdminDashboard() {
                     />
                     <p className="text-xs text-white/35">JPG, PNG, WebP, HEIC y más · máx. 10 fotos</p>
                   </div>
+
+                  {photoItems.length > 0 ? (
+                    <div className="rounded-xl border border-white/15 bg-white/5 p-3">
+                      <p className="text-xs font-semibold text-white/70">
+                        Fotos cargadas ({photoItems.length})
+                      </p>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {photoItems.map((photo, index) => (
+                          <article
+                            key={`${photo.slice(0, 24)}-${index}`}
+                            className="rounded-xl border border-white/15 bg-black/20 p-2"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-[11px] font-semibold text-white/60">Foto {index + 1}</p>
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePhoto(index)}
+                                className="rounded-full border border-rose-300/35 bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold text-rose-200"
+                              >
+                                Quitar
+                              </button>
+                            </div>
+
+                            {isLikelyImageSource(photo) ? (
+                              <div className="mt-2 overflow-hidden rounded-lg border border-white/10 bg-black/25">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={photo}
+                                  alt={`Vista previa foto ${index + 1}`}
+                                  className="h-24 w-full object-cover"
+                                  loading="lazy"
+                                />
+                              </div>
+                            ) : null}
+
+                            <p className="mt-2 line-clamp-2 break-all text-[11px] text-white/45">{photo}</p>
+                          </article>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
@@ -904,6 +943,7 @@ export function AdminDashboard() {
         </article>
 
       </section>
+          ) : null}
 
       {/* Profiles list — inside perfiles tab */}
       <section className="mt-8 rounded-3xl border border-white/20 bg-white/8 p-6 backdrop-blur-sm">
@@ -911,14 +951,34 @@ export function AdminDashboard() {
           <h2 className="font-[var(--font-heading)] font-bold text-3xl">
             Perfiles registrados ({profiles.length})
           </h2>
-          <button
-            type="button"
-            onClick={() => void fetchProfiles()}
-            className="rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold"
-          >
-            Refrescar
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleOpenCreateProfile}
+              className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent-ink)]"
+            >
+              Agregar perfil
+            </button>
+            <button
+              type="button"
+              onClick={() => void fetchProfiles()}
+              className="rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold"
+            >
+              Refrescar
+            </button>
+          </div>
         </div>
+
+        {!showProfileForm && message ? (
+          <div className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3">
+            <p className="text-sm text-emerald-300">{message}</p>
+          </div>
+        ) : null}
+        {!showProfileForm && error ? (
+          <div className="mt-4 rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3">
+            <p className="text-sm text-rose-300">{error}</p>
+          </div>
+        ) : null}
 
         {loading ? (
           <p className="mt-6 text-white/65">Cargando perfiles...</p>
