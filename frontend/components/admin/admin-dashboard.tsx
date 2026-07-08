@@ -11,6 +11,7 @@ import {
   importProfiles,
   listProfiles,
   resetProfiles,
+  setProfileLanding,
   setProfileVisibility,
   updateProfile,
 } from "@/frontend/lib/profile-indexeddb";
@@ -20,6 +21,11 @@ import {
   rejectClient,
   resetClientPassword,
 } from "@/frontend/lib/client-indexeddb";
+import {
+  clearHeroCoverImage,
+  readHeroCoverImage,
+  saveHeroCoverImage,
+} from "@/frontend/lib/landing-settings";
 import { listRatingsByProfile } from "@/frontend/lib/rating-indexeddb";
 import type { CreateProfileInput, Profile } from "@/shared/profile";
 import type { Client } from "@/shared/client";
@@ -118,6 +124,7 @@ export function AdminDashboard() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetPwdClientId, setResetPwdClientId] = useState<string>("");
   const [newPassword, setNewPassword] = useState<string>("");
+  const [heroCoverImage, setHeroCoverImage] = useState<string | null>(null);
   const photoItems = parseLines(form.photosText);
 
   const fetchProfiles = useCallback(async () => {
@@ -144,7 +151,36 @@ export function AdminDashboard() {
   useEffect(() => {
     void fetchProfiles();
     void fetchClients();
+    setHeroCoverImage(readHeroCoverImage());
   }, [fetchProfiles, fetchClients]);
+
+  async function handleHeroCoverUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    setError("");
+    setMessage("");
+
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      saveHeroCoverImage(dataUrl);
+      setHeroCoverImage(dataUrl);
+      setMessage("Portada principal actualizada.");
+    } catch {
+      setError("No se pudo cargar la portada principal.");
+    }
+  }
+
+  function handleClearHeroCover() {
+    clearHeroCoverImage();
+    setHeroCoverImage(null);
+    setError("");
+    setMessage("Portada principal restablecida al diseño por defecto.");
+  }
 
   function loadProfileIntoForm(profileId: string) {
     const profile = profiles.find((item) => item.id === profileId);
@@ -247,7 +283,22 @@ export function AdminDashboard() {
       return;
     }
 
-    setMessage(isVisible ? "Perfil habilitado para clientes." : "Perfil deshabilitado.");
+    setMessage(isVisible ? "Perfil visible para clientes." : "Perfil ocultado para clientes.");
+    await fetchProfiles();
+  }
+
+  async function handleSetLanding(id: string) {
+    setError("");
+    setMessage("");
+
+    try {
+      await setProfileLanding(id);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "No se pudo destacar en landing.");
+      return;
+    }
+
+    setMessage("Perfil destacado en landing principal.");
     await fetchProfiles();
   }
 
@@ -479,13 +530,22 @@ export function AdminDashboard() {
           <p className="text-xs font-semibold tracking-[0.14em] uppercase text-white/70">
             Panel de Administracion
           </p>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20 transition"
-          >
-            <span aria-hidden>←</span>
-            Ir a pagina principal
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/"
+              target="_blank"
+              className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20 transition"
+            >
+              Ver landing
+            </Link>
+            <Link
+              href="/members"
+              target="_blank"
+              className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-200 hover:bg-emerald-400/20 transition"
+            >
+              Ver zona clientes
+            </Link>
+          </div>
         </div>
         <h1 className="mt-3 font-[var(--font-heading)] font-extrabold text-5xl">Mantenimiento</h1>
         <p className="mt-4 max-w-3xl text-white/85">
@@ -1108,9 +1168,21 @@ export function AdminDashboard() {
                           profile.isVisible ? "bg-emerald-400" : "bg-white/30"
                         }`}
                       />
-                      {profile.isVisible ? "Visible" : "Activar"}
+                      {profile.isVisible ? "Para clientes ✓" : "Para clientes"}
                     </label>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleSetLanding(profile.id)}
+                    className={`w-full rounded-full border px-4 py-2 text-xs font-semibold transition-all ${
+                      profile.isLanding
+                        ? "border-amber-400/40 bg-amber-400/15 text-amber-200"
+                        : "border-white/20 bg-white/5 text-white/60 hover:bg-white/10"
+                    }`}
+                  >
+                    {profile.isLanding ? "⭐ En landing" : "Destacar en landing"}
+                  </button>
 
                   {confirmDeleteId === profile.id ? (
                     <div className="flex gap-2">
@@ -1308,6 +1380,42 @@ export function AdminDashboard() {
             Exporta una copia de seguridad, importa desde un respaldo anterior, o reinicia la base
             al estado inicial.
           </p>
+
+          <div className="mt-6 rounded-2xl border border-white/15 bg-white/5 p-5">
+            <p className="font-semibold">Portada principal de la landing</p>
+            <p className="mt-1 text-sm text-white/55">
+              Esta imagen solo se usa en el hero de portada y no afecta las fotos de perfiles.
+            </p>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+              <label className="flex w-full cursor-pointer items-center justify-center rounded-full border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-semibold">
+                Subir imagen de portada
+                <input
+                  type="file"
+                  accept="image/*,.heic,.heif,.avif,.bmp,.tiff,.tif,.webp,.jpg,.jpeg,.png,.gif,.svg"
+                  className="hidden"
+                  onChange={(event) => void handleHeroCoverUpload(event)}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={handleClearHeroCover}
+                className="rounded-full border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-semibold"
+              >
+                Usar portada por defecto
+              </button>
+            </div>
+
+            <div className="mt-4 overflow-hidden rounded-xl border border-white/15 bg-black/25">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={heroCoverImage ?? "/agency/hero-model.svg"}
+                alt="Vista previa de portada principal"
+                className="h-48 w-full object-cover"
+                loading="lazy"
+              />
+            </div>
+          </div>
 
           {message ? (
             <div className="mt-5 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3">

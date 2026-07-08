@@ -69,6 +69,7 @@ function getInitialProfile(): Profile {
     photos: DEFAULT_PHOTOS,
     videos: [],
     isVisible: true,
+    isLanding: true,
     createdAt: now,
     updatedAt: now,
   };
@@ -160,7 +161,7 @@ export async function listProfiles(): Promise<Profile[]> {
 
 export async function getActiveProfile(): Promise<Profile | null> {
   const profiles = await listProfiles();
-  return profiles.find((profile) => profile.isVisible) ?? null;
+  return profiles.find((profile) => profile.isLanding) ?? null;
 }
 
 export async function createProfile(input: CreateProfileInput): Promise<Profile> {
@@ -186,6 +187,7 @@ export async function createProfile(input: CreateProfileInput): Promise<Profile>
     photos,
     videos,
     isVisible: Boolean(input.isVisible),
+    isLanding: Boolean(input.isLanding),
     createdAt: now,
     updatedAt: now,
   };
@@ -193,9 +195,9 @@ export async function createProfile(input: CreateProfileInput): Promise<Profile>
   const { database, transaction, store } = await getStore("readwrite");
   const existing = (await requestResult(store.getAll())) as Profile[];
 
-  if (profile.isVisible) {
+  if (profile.isLanding) {
     for (const item of existing) {
-      item.isVisible = false;
+      item.isLanding = false;
       item.updatedAt = now;
       await requestResult(store.put(item));
     }
@@ -280,8 +282,8 @@ export async function setProfileVisibility(id: string, isVisible: boolean): Prom
   const now = new Date().toISOString();
   const updatedProfiles = profiles.map((profile) => ({
     ...profile,
-    isVisible: isVisible ? profile.id === id : profile.id === id ? false : profile.isVisible,
-    updatedAt: now,
+    isVisible: profile.id === id ? isVisible : profile.isVisible,
+    updatedAt: profile.id === id ? now : profile.updatedAt,
   }));
 
   const { database, transaction, store } = await getStore("readwrite");
@@ -302,6 +304,26 @@ export async function setProfileVisibility(id: string, isVisible: boolean): Prom
   });
 
   return updatedProfiles.find((profile) => profile.id === id) ?? target;
+}
+
+export async function setProfileLanding(id: string): Promise<void> {
+  const profiles = await listProfiles();
+  const now = new Date().toISOString();
+  const updated = profiles.map((profile) => ({
+    ...profile,
+    isLanding: profile.id === id,
+    updatedAt: profile.id === id ? now : profile.updatedAt,
+  }));
+
+  const { database, transaction, store } = await getStore("readwrite");
+  for (const profile of updated) {
+    await requestResult(store.put(profile));
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    transaction.oncomplete = () => { database.close(); resolve(); };
+    transaction.onerror = () => { database.close(); reject(transaction.error ?? new Error("No se pudo actualizar landing.")); };
+  });
 }
 
 export async function deleteProfile(id: string): Promise<void> {

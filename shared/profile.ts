@@ -15,6 +15,7 @@ export type Profile = {
   photos: string[];
   videos: string[];
   isVisible: boolean;
+  isLanding: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -35,6 +36,7 @@ export type CreateProfileInput = {
   photos: string[];
   videos: string[];
   isVisible?: boolean;
+  isLanding?: boolean;
 };
 
 export type UpdateProfileInput = Partial<Omit<CreateProfileInput, "isVisible">>;

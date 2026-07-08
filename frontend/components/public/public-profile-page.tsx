@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getActiveProfile } from "@/frontend/lib/profile-indexeddb";
 import { getRatingSummary, upsertRating } from "@/frontend/lib/rating-indexeddb";
 import { readSession, type AuthSession } from "@/frontend/lib/auth-session";
+import { readHeroCoverImage } from "@/frontend/lib/landing-settings";
 import type { Profile } from "@/shared/profile";
 import type { RatingSummary } from "@/shared/rating";
 
@@ -52,6 +53,15 @@ function getVideoRenderer(value: string): { kind: "video" | "iframe"; src: strin
   return { kind: "video", src: normalized };
 }
 
+function getHourlyPriceLabel(value: string): string {
+  const normalized = value.trim();
+  if (!normalized) {
+    return "Consultar";
+  }
+
+  return normalized.replace(/2\s*horas?/gi, "1 hora").replace(/Desde\s*/gi, "").trim();
+}
+
 function getFlagFromNationality(nationality: string): string {
   const value = nationality.trim().toLowerCase();
 
@@ -80,6 +90,7 @@ export function PublicProfilePage() {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [heroCoverImage, setHeroCoverImage] = useState<string | null>(null);
   // Rating data kept for future feature expansion
   const _trustItems = [
     { label: "Resenas verificadas", value: String(ratingSummary?.total ?? 0) },
@@ -109,8 +120,10 @@ export function PublicProfilePage() {
     async function loadProfile() {
       const activeProfile = await getActiveProfile();
       const persistedSession = readSession();
+      const landingHeroCover = readHeroCoverImage();
       setProfile(activeProfile);
       setSession(persistedSession);
+      setHeroCoverImage(landingHeroCover);
 
       if (activeProfile) {
         const summary = await getRatingSummary(activeProfile.id);
@@ -188,7 +201,7 @@ export function PublicProfilePage() {
   }
 
   return (
-    <main className="relative mx-auto w-full max-w-6xl overflow-x-hidden px-6 py-10 pt-28 md:px-10 md:py-14 md:pt-32">
+    <main className="relative mx-auto w-full max-w-6xl overflow-x-hidden px-6 py-6 md:px-10 md:py-14 md:pt-32">
       <style>{`
         @keyframes fadeInUp {
           from {
@@ -242,6 +255,41 @@ export function PublicProfilePage() {
             box-shadow: 0 0 40px rgba(217, 70, 239, 0.2);
           }
         }
+
+        @keyframes whatsapp-pulse {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.32);
+            transform: translateY(0);
+          }
+          50% {
+            box-shadow: 0 0 0 10px rgba(37, 211, 102, 0);
+            transform: translateY(-1px);
+          }
+        }
+
+        @keyframes whatsapp-float-pulse {
+          0%, 100% {
+            box-shadow:
+              0 0 0 0 rgba(37, 211, 102, 0.55),
+              0 0 0 0 rgba(37, 211, 102, 0.32),
+              0 10px 26px rgba(0, 0, 0, 0.35);
+            transform: scale(1);
+          }
+          35% {
+            box-shadow:
+              0 0 0 14px rgba(37, 211, 102, 0.18),
+              0 0 0 0 rgba(37, 211, 102, 0.28),
+              0 12px 30px rgba(37, 211, 102, 0.25);
+            transform: scale(1.07);
+          }
+          70% {
+            box-shadow:
+              0 0 0 20px rgba(37, 211, 102, 0),
+              0 0 0 8px rgba(37, 211, 102, 0),
+              0 12px 30px rgba(37, 211, 102, 0.18);
+            transform: scale(1.02);
+          }
+        }
         
         .animate-fade-in-up {
           animation: fadeInUp 0.6s ease-out forwards;
@@ -262,12 +310,21 @@ export function PublicProfilePage() {
         .glow-border {
           animation: glow-pulse 3s ease-in-out infinite;
         }
+
+        .whatsapp-cta {
+          animation: whatsapp-pulse 1.9s ease-in-out infinite;
+        }
+
+        .whatsapp-float-cta {
+          animation: whatsapp-float-pulse 1.15s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+          will-change: transform, box-shadow;
+        }
       `}</style>
-      <header className="fixed left-6 right-6 top-4 z-50 flex flex-col gap-4">
+      <header className="sticky top-0 z-50 -mx-6 mb-6 border-b border-white/10 bg-black/35 px-6 py-4 backdrop-blur-xl md:fixed md:left-6 md:right-6 md:top-4 md:mx-0 md:mb-0 md:border-b-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-0">
         <div className="flex items-center justify-between md:justify-start md:gap-8">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/30 bg-white/10 text-lg shadow-lg">
-              ✨
+              <span className="text-sm font-bold tracking-[0.2em] text-white/80">AA</span>
             </div>
             <div>
               <p className="text-xs font-semibold tracking-[0.18em] uppercase text-white/70">Agencia Aurora</p>
@@ -275,18 +332,21 @@ export function PublicProfilePage() {
           </div>
 
           <nav className="hidden md:flex flex-wrap items-center gap-2">
-            <a href="#galeria" className="rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/15 transition">
-              Galeria
-            </a>
             <a href="#reels" className="rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/15 transition">
-              Reels
+              Perfiles
+            </a>
+            <a href="#videos" className="rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/15 transition">
+              Videos
+            </a>
+            <a href="#galeria" className="rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/15 transition">
+              Imagen y trato
             </a>
             <a href="#confianza" className="rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/15 transition">
-              Confianza
+              Acceso clientes
             </a>
           </nav>
 
-          <div className="flex items-center gap-2 md:ms-auto">
+          <div className="flex items-center gap-2 md:ms-auto md:flex-wrap md:justify-end">
             <button
               type="button"
               onClick={() => setIsMenuOpen((prev) => !prev)}
@@ -298,7 +358,7 @@ export function PublicProfilePage() {
               href="/client"
               className="hidden md:flex rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent)]/85 px-4 py-2 text-sm font-bold text-[var(--accent-ink)] transition hover:brightness-110 hover:shadow-lg hover:shadow-[var(--accent)]/40"
             >
-              Iniciar sesión
+              Iniciar sesion
             </Link>
           </div>
         </div>
@@ -306,207 +366,161 @@ export function PublicProfilePage() {
         {isMenuOpen && (
           <nav className="md:hidden mt-4 flex flex-col gap-2 border-t border-white/15 pt-4">
             <a
-              href="#galeria"
-              onClick={() => setIsMenuOpen(false)}
-              className="rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent)]/85 px-4 py-2 text-sm font-bold text-[var(--accent-ink)] transition hover:brightness-110 hover:shadow-lg hover:shadow-[var(--accent)]/40"
-            >
-              Galeria
-            </a>
-            <a
               href="#reels"
               onClick={() => setIsMenuOpen(false)}
               className="rounded-full border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/15 transition"
             >
-              Reels
+              Perfiles
+            </a>
+            <a
+              href="#videos"
+              onClick={() => setIsMenuOpen(false)}
+              className="rounded-full border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/15 transition"
+            >
+              Videos
+            </a>
+            <a
+              href="#galeria"
+              onClick={() => setIsMenuOpen(false)}
+              className="rounded-full border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/15 transition"
+            >
+              Imagen y trato
             </a>
             <a
               href="#confianza"
               onClick={() => setIsMenuOpen(false)}
               className="rounded-full border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/15 transition"
             >
-              Confianza
+              Acceso clientes
             </a>
             <Link
               href="/client"
               onClick={() => setIsMenuOpen(false)}
               className="rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent)]/85 px-4 py-2 text-sm font-bold text-[var(--accent-ink)] transition hover:brightness-110 hover:shadow-lg hover:shadow-[var(--accent)]/40"
             >
-              Iniciar sesión
+              Iniciar sesion
             </Link>
           </nav>
         )}
       </header>
 
-      <section className="grid gap-8 rounded-3xl border border-white/25 bg-gradient-to-br from-white/12 via-white/8 to-white/6 p-6 backdrop-blur-xl shadow-2xl md:grid-cols-[1.15fr_0.85fr] md:p-10">
-        <div className="animate-fade-in-up">
-          <p className="text-xs font-semibold tracking-[0.16em] uppercase text-white/70">
-            ✨ Landing principal
-          </p>
-          <h1 className="mt-3 font-[var(--font-heading)] font-extrabold text-6xl leading-tight md:text-7xl bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
-            Elegancia, presencia y coordinacion premium para una noche inolvidable.
-          </h1>
-          <p className="mt-4 max-w-2xl text-lg text-white/85 leading-relaxed">
-            Acceso a perfil disponible con validacion de cliente.
-          </p>
+      <div className="animate-fade-in-up py-10 md:py-16 text-center flex flex-col items-center">
+        <p className="inline-flex rounded-full border border-white/20 bg-white/8 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
+          Agencia Aurora
+        </p>
+        <h1 className="mt-5 max-w-2xl font-[var(--font-heading)] text-4xl font-extrabold leading-[1.05] text-white md:text-5xl lg:text-6xl">
+          Modelos, anfitrionas y acompanantes para eventos con imagen, presencia y atencion privada.
+        </h1>
+        <p className="mt-6 max-w-xl text-base leading-7 text-white/70 md:text-lg md:leading-8">
+          Seleccion de perfiles para eventos sociales, reuniones privadas, imagen de marca y acompanamiento con trato reservado y coordinacion directa.
+        </p>
 
-          <div className="mt-8 flex flex-wrap gap-3">
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          {profile ? (
             <a
-              href={profile ? whatsappHref(profile.whatsappNumber) : "https://wa.me/51999999999?text=Hola%2C%20quiero%20consultar%20la%20disponibilidad"}
+              href={whatsappHref(profile.whatsappNumber)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent)]/85 px-6 py-3 text-sm font-bold text-[var(--accent-ink)] transition hover:brightness-110 hover:shadow-lg hover:shadow-[var(--accent)]/40"
+              className="inline-flex rounded-full border border-[#25D366]/70 bg-gradient-to-r from-[#25D366] to-[#1ebe5d] px-7 py-3.5 text-sm font-bold text-[#04160a] transition hover:brightness-110 hover:shadow-xl hover:shadow-[#25D366]/40"
             >
-              📱 Consultar por WhatsApp
+              Contactar por WhatsApp
             </a>
-            <Link
-              href="/client"
-              className="inline-flex rounded-full border border-white/30 bg-gradient-to-r from-white/12 to-white/6 px-6 py-3 text-sm font-semibold hover:from-white/20 hover:to-white/12 transition shadow-lg"
-            >
-              🔑 Entrar como cliente
-            </Link>
-          </div>
+          ) : null}
         </div>
-
-        <aside className="animate-slide-in rounded-3xl border-2 border-white/25 overflow-hidden shadow-2xl relative h-[600px] w-full max-w-md mx-auto">
-          {profile ? (
-            <div className="relative h-full w-full">
-              {/* Foto de fondo */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={profile.photos[currentPhotoIndex]}
-                alt={profile.displayName}
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-              
-              {/* Gradiente oscuro para legibilidad */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
-
-              {/* Botones de navegar fotos */}
-              <div className="absolute top-4 right-4 flex gap-2 z-10">
-                <button
-                  onClick={() => setCurrentPhotoIndex((prev) => (prev - 1 + profile.photos.length) % profile.photos.length)}
-                  className="rounded-full border border-white/50 bg-black/60 backdrop-blur px-3 py-2 text-xs font-semibold hover:bg-black/80 transition text-white"
-                >
-                  ←
-                </button>
-                <button
-                  onClick={() => setCurrentPhotoIndex((prev) => (prev + 1) % profile.photos.length)}
-                  className="rounded-full border border-white/50 bg-black/60 backdrop-blur px-3 py-2 text-xs font-semibold hover:bg-black/80 transition text-white"
-                >
-                  →
-                </button>
-              </div>
-
-              {/* Contador de fotos */}
-              <p className="absolute top-4 left-4 text-xs font-bold text-white/90 z-10 rounded-full bg-black/60 backdrop-blur px-3 py-1">
-                {currentPhotoIndex + 1}/{profile.photos.length}
-              </p>
-
-              {/* Información superpuesta abajo */}
-              <div className="absolute inset-x-0 bottom-0 p-6 z-20">
-                {/* Nombre y edad */}
-                <h2 className="font-[var(--font-heading)] font-extrabold text-5xl text-white leading-tight">
-                  {profile.displayName}
-                </h2>
-                <p className="mt-1 text-2xl font-bold text-white">
-                  {profile.age}
-                </p>
-
-                {/* Nacionalidad con bandera */}
-                <p className="mt-2 text-sm font-bold tracking-wide text-white/95">
-                  {getFlagFromNationality(profile.nationality)} {profile.nationality.toUpperCase()}
-                </p>
-
-                {/* Horario y precio en badges */}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <span className="rounded-full border border-[var(--accent)]/60 bg-[var(--accent)]/20 backdrop-blur px-3 py-1 text-xs font-extrabold tracking-wide text-[var(--accent)]">
-                    Disponible de 13:00 a 18:00
-                  </span>
-                  <span className="rounded-full border border-emerald-300/60 bg-emerald-400/20 backdrop-blur px-3 py-1 text-xs font-extrabold tracking-wide text-emerald-200">
-                    Precio: hora 200 soles
-                  </span>
-                </div>
-
-                {/* Botones de acción */}
-                <div className="mt-4 flex gap-3">
-                  <a
-                    href={whatsappHref(profile.whatsappNumber)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent)]/85 px-4 py-3 text-sm font-bold text-[var(--accent-ink)] transition hover:brightness-110 hover:shadow-lg hover:shadow-[var(--accent)]/50 text-center"
-                  >
-                    📱 WhatsApp
-                  </a>
-                  <Link
-                    href="/client"
-                    className="flex-1 rounded-full border border-white/40 bg-white/15 backdrop-blur px-4 py-3 text-sm font-bold text-white transition hover:bg-white/25 text-center"
-                  >
-                    🔑 Entrar
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/5 to-black/40">
-              <div className="text-center">
-                <p className="text-xs font-semibold tracking-[0.16em] uppercase text-white/65">
-                  ⏳ Status
-                </p>
-                <h2 className="mt-3 font-[var(--font-heading)] text-4xl text-white">No hay perfil visible</h2>
-                <p className="mt-4 text-white/85">
-                  Regresa en unos minutos.
-                </p>
-              </div>
-            </div>
-          )}
-        </aside>
-      </section>
-
-      {profile ? (
-        <section id="galeria" className="mt-12 animate-fade-in-up">
-          <h2 className="font-[var(--font-heading)] font-bold text-5xl">💫 Caracteristicas y trato</h2>
-          <div className="mt-5 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border border-white/25 bg-gradient-to-br from-white/10 to-white/5 p-5 hover:border-white/40 hover:from-white/15 hover:to-white/10 transition shadow-lg">
-              <p className="leading-7 text-white/85">{profile.physicalTraits}</p>
-            </div>
-            <div className="rounded-2xl border border-white/25 bg-gradient-to-br from-white/10 to-white/5 p-5 hover:border-white/40 hover:from-white/15 hover:to-white/10 transition shadow-lg">
-              <p className="leading-7 text-white/85">{profile.treatmentStyle}</p>
-            </div>
-          </div>
-        </section>
-      ) : null}
+      </div>
 
       {profile ? (
         <section id="reels" className="mt-12 animate-fade-in-up">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="font-[var(--font-heading)] font-bold text-5xl">🖼️ Galeria de fotos ({currentPhotoIndex + 1}/{profile.photos.length})</h2>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPhotoIndex((prev) => (prev - 1 + profile.photos.length) % profile.photos.length)}
-                className="rounded-full border border-white/25 bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/20 transition"
-              >
-                ← Anterior
-              </button>
-              <button
-                onClick={() => setCurrentPhotoIndex((prev) => (prev + 1) % profile.photos.length)}
-                className="rounded-full border border-white/25 bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/20 transition"
-              >
-                Siguiente →
-              </button>
-            </div>
+          <div className="mb-6">
+            <h2 className="font-[var(--font-heading)] font-bold text-5xl">Perfiles disponibles hoy</h2>
+            <p className="mt-2 max-w-3xl text-sm text-white/70">
+              Revisa la disponibilidad visible del momento y conoce cada perfil antes de escribir por WhatsApp.
+            </p>
           </div>
 
           {/* Imagen destacada grande */}
-          <article className="rounded-2xl border-2 border-white/30 bg-white/5 overflow-hidden shadow-2xl hover:border-white/50 transition carousel-image mb-6">
-            <div className="relative w-full overflow-hidden rounded-xl" style={{ aspectRatio: "16/10" }}>
+          <article className="rounded-2xl border-2 border-white/30 bg-black/40 overflow-hidden shadow-2xl hover:border-white/50 transition carousel-image mb-6">
+            <div className="relative w-full overflow-hidden rounded-xl" style={{ aspectRatio: "1/1" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={profile.photos[currentPhotoIndex]}
                 alt={`Foto ${currentPhotoIndex + 1} de ${profile.displayName}`}
-                className="h-full w-full object-cover animate-fade-in-scale"
+                className="absolute inset-0 h-full w-full object-cover animate-fade-in-scale"
                 loading="lazy"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent" />
+
+              <div className="absolute left-0 right-0 top-0 z-10 flex items-center justify-between p-3 md:p-4">
+                <p className="rounded-full border border-white/35 bg-black/55 px-3 py-1 text-xs font-bold text-white/95 backdrop-blur">
+                  {currentPhotoIndex + 1}/{profile.photos.length}
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPhotoIndex((prev) => (prev - 1 + profile.photos.length) % profile.photos.length)}
+                    className="rounded-full border border-white/40 bg-black/55 px-3 py-2 text-xs font-semibold text-white backdrop-blur hover:bg-black/75 transition"
+                    aria-label="Foto anterior"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    onClick={() => setCurrentPhotoIndex((prev) => (prev + 1) % profile.photos.length)}
+                    className="rounded-full border border-white/40 bg-black/55 px-3 py-2 text-xs font-semibold text-white backdrop-blur hover:bg-black/75 transition"
+                    aria-label="Foto siguiente"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+
+              <div className="absolute inset-x-0 bottom-0 p-4 md:p-6">
+                <div className="grid gap-3 md:max-w-xl">
+                  <h3 className="font-[var(--font-heading)] text-4xl font-extrabold leading-none text-white drop-shadow-lg md:text-5xl">
+                    {profile.displayName}
+                  </h3>
+
+                  <p className="text-3xl font-extrabold leading-none text-white/95 md:text-4xl">
+                    {profile.age}
+                  </p>
+
+                  <p className="text-sm font-bold tracking-[0.08em] text-white/90">
+                    {getFlagFromNationality(profile.nationality)} {profile.nationality.toUpperCase()}
+                  </p>
+
+                  <div className="grid justify-items-start gap-2">
+                    <div className="w-fit max-w-full rounded-2xl border border-white/25 bg-black/35 px-3 py-2.5 backdrop-blur">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/55">
+                        Disponibilidad
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-white/90">{profile.schedule}</p>
+                    </div>
+
+                    <div className="w-fit max-w-full rounded-2xl border border-[#25D366]/45 bg-[#25D366]/15 px-3 py-2.5 backdrop-blur">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#b7f9d1]">
+                        Tarifa por hora
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-[#d9ffe8]">{getHourlyPriceLabel(profile.costText)}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <a
+                      href={whatsappHref(profile.whatsappNumber)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="whatsapp-cta inline-flex items-center justify-center rounded-full border border-[#25D366]/70 bg-gradient-to-r from-[#25D366] to-[#1ebe5d] px-3.5 py-2 text-xs font-bold text-[#04160a] transition hover:brightness-110 hover:shadow-lg hover:shadow-[#25D366]/40"
+                    >
+                      WhatsApp
+                    </a>
+                    <Link
+                      href="/client"
+                      className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/15 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-white/25"
+                    >
+                      Entrar
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </div>
           </article>
 
@@ -523,7 +537,7 @@ export function PublicProfilePage() {
                 }`}
               >
                 {/* Cuadrado grande con foto completa */}
-                <div className="w-full h-full overflow-hidden bg-black/30">
+                <div className="w-full h-full overflow-hidden bg-black/40">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={photo}
@@ -533,12 +547,8 @@ export function PublicProfilePage() {
                   />
                 </div>
 
-                {/* Overlay con número */}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 transition rounded-2xl">
-                  <span className="text-white font-bold text-lg opacity-0 group-hover:opacity-100 transition">
-                    {idx + 1}
-                  </span>
-                </div>
+                {/* Overlay hover */}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition rounded-2xl" />
               </button>
             ))}
 
@@ -571,15 +581,23 @@ export function PublicProfilePage() {
         </section>
       ) : null}
 
+      {profile ? (
+        <section id="galeria" className="mt-12 animate-fade-in-up">
+          <div className="mt-0 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-white/15 p-5 hover:border-white/30 transition">
+              <p className="leading-7 text-white/85">{profile.physicalTraits}</p>
+            </div>
+            <div className="rounded-2xl border border-white/15 p-5 hover:border-white/30 transition">
+              <p className="leading-7 text-white/85">{profile.treatmentStyle}</p>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {profile && profile.videos.length > 0 ? (
-        <section id="videos" className="mx-auto mt-16 w-full max-w-7xl animate-fade-in-up">
-          <h2 className="font-[var(--font-heading)] font-bold text-5xl md:text-6xl">🎬 Videos ({profile.videos.length})</h2>
-          <p className="mt-2 text-sm text-white/65">
-            Se muestran enlaces directos de video y también enlaces de YouTube.
-          </p>
-          
-          {/* Grid de videos cuadrados con reproductor */}
-          <div className="mt-8 grid justify-items-center gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <section id="videos" className="mt-12 animate-fade-in-up">
+          <h2 className="text-center font-[var(--font-heading)] font-bold text-5xl md:text-6xl">Videos</h2>
+          <div className="mt-8 flex flex-col items-center gap-6">
             {profile.videos.map((video, idx) => (
               <article
                 key={idx}
@@ -591,10 +609,8 @@ export function PublicProfilePage() {
                       : "max-w-3xl aspect-[4/3] sm:aspect-video lg:col-span-1 lg:min-h-[16rem] xl:aspect-[16/9]"
                 }`}
               >
-                {/* Video player */}
                 {(() => {
                   const player = getVideoRenderer(video);
-
                   if (player.kind === "iframe") {
                     return (
                       <iframe
@@ -606,7 +622,6 @@ export function PublicProfilePage() {
                       />
                     );
                   }
-
                   return (
                     <video
                       src={player.src}
@@ -616,81 +631,45 @@ export function PublicProfilePage() {
                     />
                   );
                 })()}
-
-                {/* Overlay con información */}
-                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-3 opacity-0 group-hover:opacity-100 transition">
-                  <p className="text-xs font-bold text-white">Video {idx + 1}</p>
-                  <p className="text-[10px] text-white/70 mt-0.5">Click para reproducir</p>
-                </div>
               </article>
             ))}
           </div>
         </section>
       ) : null}
 
-      <section id="confianza" className="mt-12 rounded-3xl border border-white/25 bg-gradient-to-r from-white/12 via-white/8 to-white/6 p-6 backdrop-blur-xl shadow-2xl md:p-8 animate-fade-in-up">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs font-semibold tracking-[0.16em] uppercase text-white/70">
-              🔐 Zona privada
-            </p>
-            <h2 className="mt-2 font-[var(--font-heading)] font-bold text-4xl text-white">Acceso para clientes</h2>
-            <p className="mt-2 max-w-2xl text-white/80">
-              Registra tu cuenta, espera validacion del admin e ingresa a la zona de clientes para mas detalles.
-            </p>
-          </div>
-          <a
-            href="/client"
-            className="inline-flex rounded-full border border-white/30 bg-gradient-to-r from-white/12 to-white/6 px-5 py-3 text-sm font-semibold hover:from-white/20 hover:to-white/12 transition shadow-lg whitespace-nowrap"
-          >
-            → Ir a clientes
-          </a>
-        </div>
+      <section id="confianza" className="mt-16 animate-fade-in-up text-center flex flex-col items-center gap-5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/50">Zona privada</p>
+        <h2 className="font-[var(--font-heading)] font-bold text-4xl text-white md:text-5xl">Acceso para clientes</h2>
+        <p className="max-w-sm text-sm leading-6 text-white/60">
+          Crea tu cuenta y solicita acceso. Una vez aprobado por el administrador podras ver todos los detalles del perfil disponible.
+        </p>
+        <Link
+          href="/client"
+          className="inline-flex rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent)]/85 px-8 py-3.5 text-sm font-bold text-[var(--accent-ink)] transition hover:brightness-110 hover:shadow-xl hover:shadow-[var(--accent)]/40"
+        >
+          Iniciar sesion / Registrarse
+        </Link>
       </section>
 
-      <footer className="mt-6 rounded-3xl border border-white/20 bg-black/25 p-6 backdrop-blur-xl shadow-2xl md:p-8">
-        <div className="grid gap-6 md:grid-cols-3">
-          <div>
-            <p className="text-xs font-semibold tracking-[0.16em] uppercase text-white/65">Agencia Aurora</p>
-            <p className="mt-2 text-sm text-white/80">
-              Experiencias premium con protocolo, puntualidad y atencion personalizada.
-            </p>
-          </div>
-
-          <div>
-            <p className="text-xs font-semibold tracking-[0.16em] uppercase text-white/65">Navegacion</p>
-            <div className="mt-2 grid gap-2 text-sm text-white/80">
-              <a href="#galeria" className="hover:text-white transition">Ver galeria</a>
-              <a href="#reels" className="hover:text-white transition">Ver reels</a>
-              <a href="#confianza" className="hover:text-white transition">Confianza y seguridad</a>
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs font-semibold tracking-[0.16em] uppercase text-white/65">Contacto</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <a
-                href={profile ? whatsappHref(profile.whatsappNumber) : "https://wa.me/51999999999?text=Hola%2C%20quiero%20consultar%20la%20disponibilidad"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-bold text-[var(--accent-ink)] hover:brightness-110 transition"
-              >
-                WhatsApp directo
-              </a>
-              <Link
-                href="/client"
-                className="inline-flex rounded-full border border-white/25 bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/20 transition"
-              >
-                Area clientes
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 border-t border-white/15 pt-4 text-xs text-white/60">
-          © {new Date().getFullYear()} Agencia Aurora. Plataforma privada de coordinacion y atencion premium.
-        </div>
+      <footer className="mt-12 border-t border-white/10 py-6 text-center">
+        <p className="text-xs text-white/35">© {new Date().getFullYear()} Agencia Aurora</p>
       </footer>
+
+      <a
+        href={profile ? whatsappHref(profile.whatsappNumber) : "https://wa.me/51999999999?text=Hola%2C%20quiero%20consultar%20la%20disponibilidad"}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Contactar por WhatsApp"
+        className="whatsapp-float-cta fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full border border-[#25D366]/85 bg-[#25D366] text-lg font-black text-[#04160a] shadow-2xl shadow-[#25D366]/30 transition hover:scale-110 hover:brightness-110 md:bottom-6 md:right-6"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          className="h-7 w-7 fill-white"
+        >
+          <path d="M19.05 4.91A9.82 9.82 0 0 0 12.03 2C6.58 2 2.15 6.42 2.15 11.88c0 1.75.46 3.46 1.32 4.97L2 22l5.3-1.39a9.9 9.9 0 0 0 4.73 1.2h.01c5.45 0 9.88-4.43 9.88-9.88a9.8 9.8 0 0 0-2.87-7.02Zm-7.02 15.23h-.01a8.2 8.2 0 0 1-4.18-1.14l-.3-.18-3.15.83.84-3.07-.2-.31a8.17 8.17 0 0 1-1.26-4.39c0-4.52 3.68-8.2 8.21-8.2 2.19 0 4.24.85 5.79 2.4a8.13 8.13 0 0 1 2.4 5.8c0 4.53-3.68 8.21-8.14 8.21Zm4.5-6.14c-.25-.13-1.47-.72-1.7-.8-.23-.08-.39-.13-.56.13-.16.25-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.13-1.04-.38-1.99-1.22-.74-.66-1.24-1.47-1.38-1.72-.14-.25-.01-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.16.04-.31-.02-.43-.06-.13-.56-1.35-.77-1.85-.2-.48-.4-.41-.56-.42h-.47c-.16 0-.43.06-.66.31-.23.25-.87.85-.87 2.07 0 1.22.89 2.4 1.02 2.56.12.16 1.75 2.67 4.23 3.74.59.26 1.05.42 1.41.54.59.19 1.13.16 1.55.1.47-.07 1.47-.6 1.68-1.19.21-.59.21-1.1.14-1.19-.06-.1-.22-.16-.47-.29Z" />
+        </svg>
+      </a>
     </main>
   );
 }

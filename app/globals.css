@@ -20,6 +20,7 @@ body {
     radial-gradient(circle at 84% 12%, #d12b56 0%, transparent 37%),
     radial-gradient(circle at 58% 78%, #781333 0%, transparent 31%),
     linear-gradient(150deg, #16060d 0%, #260b16 52%, #10040a 100%);
+  background-attachment: fixed;
   color: var(--text-main);
   font-family: var(--font-body), sans-serif;
 }
