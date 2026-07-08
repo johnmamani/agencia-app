@@ -17,7 +17,9 @@ import {
 } from "@/frontend/lib/profile-indexeddb";
 import {
   approveClient,
+  approveClientPendingConsumption,
   listClients,
+  rejectClientPendingConsumption,
   rejectClient,
   resetClientPassword,
 } from "@/frontend/lib/client-indexeddb";
@@ -35,9 +37,9 @@ type FormState = {
   displayName: string;
   age: string;
   nationality: string;
-  schedule: string;
-  tagline: string;
-  physicalTraits: string;
+  availableDate: string;
+  availableFromTime: string;
+  availableToTime: string;
   serviceDetails: string;
   treatmentStyle: string;
   costText: string;
@@ -49,29 +51,88 @@ type FormState = {
   isVisible: boolean;
 };
 
-const INITIAL_FORM: FormState = {
-  displayName: "",
-  age: "",
-  nationality: "",
-  schedule: "Disponible de 13:00 a 20:00",
-  tagline: "",
-  physicalTraits: "",
-  serviceDetails: "",
-  treatmentStyle: "",
-  costText: "",
-  locationText: "",
-  serviceTypeText: "",
-  whatsappNumber: "",
-  photosText: "",
-  videosText: "",
-  isVisible: false,
-};
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function toDateInputValue(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function toTimeInputValue(date: Date): string {
+  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+function addHours(date: Date, hours: number): Date {
+  return new Date(date.getTime() + hours * 60 * 60 * 1000);
+}
+
+function createScheduleLabel(dateValue: string, fromTimeValue: string, toTimeValue: string): string {
+  const [year, month, day] = dateValue.split("-");
+  return `Disponible el ${day}/${month}/${year} de ${fromTimeValue} a ${toTimeValue}`;
+}
+
+function parseScheduleToDateTimeRange(
+  value: string,
+): { date: string; fromTime: string; toTime: string } | null {
+  const rangeMatch = value.match(/(\d{2})\/(\d{2})\/(\d{4}).*?de\s+(\d{2}:\d{2})\s+a\s+(\d{2}:\d{2})/i);
+  if (rangeMatch) {
+    const [, day, month, year, fromTime, toTime] = rangeMatch;
+    return {
+      date: `${year}-${month}-${day}`,
+      fromTime,
+      toTime,
+    };
+  }
+
+  const legacyMatch = value.match(/(\d{2})\/(\d{2})\/(\d{4}).*?(\d{2}:\d{2})/);
+  if (!legacyMatch) {
+    return null;
+  }
+
+  const [, day, month, year, time] = legacyMatch;
+  const [hoursPart = "00", minutesPart = "00"] = time.split(":");
+  const startDate = new Date(Number(year), Number(month) - 1, Number(day), Number(hoursPart), Number(minutesPart));
+  const endDate = addHours(startDate, 1);
+
+  return {
+    date: `${year}-${month}-${day}`,
+    fromTime: time,
+    toTime: toTimeInputValue(endDate),
+  };
+}
+
+function createInitialForm(): FormState {
+  const now = new Date();
+
+  return {
+    displayName: "",
+    age: "",
+    nationality: "",
+    availableDate: toDateInputValue(now),
+    availableFromTime: toTimeInputValue(now),
+    availableToTime: toTimeInputValue(addHours(now, 1)),
+    serviceDetails: "",
+    treatmentStyle: "",
+    costText: "",
+    locationText: "",
+    serviceTypeText: "",
+    whatsappNumber: "",
+    photosText: "",
+    videosText: "",
+    isVisible: false,
+  };
+}
 
 function parseLines(value: string): string[] {
   return value
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+function isValidTimeRange(fromTime: string, toTime: string): boolean {
+  return fromTime < toTime;
 }
 
 function isLikelyImageSource(value: string): boolean {
@@ -108,7 +169,7 @@ function fileToDataUrl(file: File): Promise<string> {
 export function AdminDashboard() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [form, setForm] = useState<FormState>(INITIAL_FORM);
+  const [form, setForm] = useState<FormState>(createInitialForm());
   const [showProfileForm, setShowProfileForm] = useState(false);
   const [selectedId, setSelectedId] = useState<string>("");
   const [editingId, setEditingId] = useState<string>("");
@@ -125,6 +186,7 @@ export function AdminDashboard() {
   const [resetPwdClientId, setResetPwdClientId] = useState<string>("");
   const [newPassword, setNewPassword] = useState<string>("");
   const [heroCoverImage, setHeroCoverImage] = useState<string | null>(null);
+  const [confirmUpdateInCard, setConfirmUpdateInCard] = useState(false);
   const photoItems = parseLines(form.photosText);
 
   const fetchProfiles = useCallback(async () => {
@@ -190,14 +252,20 @@ export function AdminDashboard() {
     }
 
     setEditingId(profile.id);
-  setShowProfileForm(true);
+    setConfirmUpdateInCard(false);
+    setShowProfileForm(true);
+    const scheduleParts = parseScheduleToDateTimeRange(profile.schedule);
+    const now = new Date();
+    const defaultFrom = toTimeInputValue(now);
+    const defaultTo = toTimeInputValue(addHours(now, 1));
+
     setForm({
       displayName: profile.displayName,
       age: String(profile.age),
       nationality: profile.nationality,
-      schedule: profile.schedule || "Disponible de 13:00 a 20:00",
-      tagline: profile.tagline,
-      physicalTraits: profile.physicalTraits,
+      availableDate: scheduleParts?.date ?? toDateInputValue(now),
+      availableFromTime: scheduleParts?.fromTime ?? defaultFrom,
+      availableToTime: scheduleParts?.toTime ?? defaultTo,
       serviceDetails: profile.serviceDetails,
       treatmentStyle: profile.treatmentStyle,
       costText: profile.costText,
@@ -212,7 +280,8 @@ export function AdminDashboard() {
 
   function resetForm() {
     setEditingId("");
-    setForm(INITIAL_FORM);
+    setConfirmUpdateInCard(false);
+    setForm(createInitialForm());
   }
 
   function handleOpenCreateProfile() {
@@ -228,19 +297,12 @@ export function AdminDashboard() {
     setShowProfileForm(false);
   }
 
-  async function handleCreateProfile(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    setMessage("");
-    const isEditing = Boolean(editingId);
-
-    const payload: CreateProfileInput = {
+  function buildProfilePayload(): CreateProfileInput {
+    return {
       displayName: form.displayName,
       age: Number(form.age),
       nationality: form.nationality,
-      schedule: form.schedule,
-      tagline: form.tagline,
-      physicalTraits: form.physicalTraits,
+      schedule: createScheduleLabel(form.availableDate, form.availableFromTime, form.availableToTime),
       serviceDetails: form.serviceDetails,
       treatmentStyle: form.treatmentStyle,
       costText: form.costText,
@@ -251,6 +313,10 @@ export function AdminDashboard() {
       videos: parseLines(form.videosText),
       isVisible: form.isVisible,
     };
+  }
+
+  async function persistProfile(isEditing: boolean): Promise<void> {
+    const payload = buildProfilePayload();
 
     try {
       if (isEditing && editingId) {
@@ -258,18 +324,57 @@ export function AdminDashboard() {
       } else {
         await createProfile(payload);
       }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "No se pudo guardar el perfil.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "No se pudo guardar el perfil.");
       return;
     }
 
-    if (!isEditing) {
-      resetForm();
-      setMessage("Perfil registrado correctamente.");
-    } else {
-      setMessage("Perfil actualizado correctamente.");
-    }
+    resetForm();
+    setShowProfileForm(false);
+    setMessage(isEditing ? "Perfil actualizado correctamente." : "Perfil registrado correctamente.");
     await fetchProfiles();
+  }
+
+  async function handleCreateProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+    const isEditing = Boolean(editingId);
+
+    if (!isValidTimeRange(form.availableFromTime, form.availableToTime)) {
+      setError("La hora de fin debe ser mayor que la hora de inicio.");
+      return;
+    }
+
+    if (isEditing) {
+      setConfirmUpdateInCard(true);
+      return;
+    }
+
+    await persistProfile(false);
+  }
+
+  function handleCancelUpdateConfirmation() {
+    setConfirmUpdateInCard(false);
+    setMessage("Actualizacion cancelada.");
+  }
+
+  async function handleConfirmUpdateFromPopup() {
+    if (!editingId) {
+      setConfirmUpdateInCard(false);
+      return;
+    }
+
+    setError("");
+    setMessage("");
+
+    if (!isValidTimeRange(form.availableFromTime, form.availableToTime)) {
+      setError("La hora de fin debe ser mayor que la hora de inicio.");
+      return;
+    }
+
+    setConfirmUpdateInCard(false);
+    await persistProfile(true);
   }
 
   async function handleVisibility(id: string, isVisible: boolean) {
@@ -379,7 +484,7 @@ export function AdminDashboard() {
     const photoUrls: string[] = [];
     const skipped: string[] = [];
 
-    for (let i = 0; i < Math.min(files.length, 10); i++) {
+    for (let i = 0; i < files.length; i++) {
       const file = files[i];
       try {
         const dataUrl = await fileToDataUrl(file);
@@ -504,6 +609,36 @@ export function AdminDashboard() {
       setClientError(
         passwordError instanceof Error ? passwordError.message : "No se pudo restablecer la clave.",
       );
+    }
+  }
+
+  async function handleApprovePendingConsumption(id: string) {
+    setClientError("");
+    setClientMessage("");
+
+    try {
+      const updatedClient = await approveClientPendingConsumption(id);
+      if (updatedClient.totalConsumptions % 5 === 0) {
+        setClientMessage("Consumo validado. Cliente desbloqueo un servicio gratis.");
+      } else {
+        setClientMessage("Consumo validado y sumado al cliente.");
+      }
+      await fetchClients();
+    } catch (validationError) {
+      setClientError(validationError instanceof Error ? validationError.message : "No se pudo validar el consumo.");
+    }
+  }
+
+  async function handleRejectPendingConsumption(id: string) {
+    setClientError("");
+    setClientMessage("");
+
+    try {
+      await rejectClientPendingConsumption(id);
+      setClientMessage("Solicitud de consumo rechazada.");
+      await fetchClients();
+    } catch (validationError) {
+      setClientError(validationError instanceof Error ? validationError.message : "No se pudo rechazar la solicitud.");
     }
   }
 
@@ -644,6 +779,32 @@ export function AdminDashboard() {
         <>
           {showProfileForm ? (
           <section className="mt-6">
+            {editingId && confirmUpdateInCard ? (
+              <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 px-4">
+                <div className="w-full max-w-md rounded-2xl border border-white/20 bg-[#121212] p-5 shadow-2xl">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">Confirmar cambios</p>
+                  <h3 className="mt-2 text-lg font-bold text-white">¿Actualizar este perfil?</h3>
+                  <p className="mt-1 text-sm text-white/65">Esta accion guardara los cambios en el perfil actual.</p>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleConfirmUpdateFromPopup}
+                      className="rounded-full bg-emerald-500 px-4 py-2 text-xs font-bold text-emerald-950 hover:brightness-110 transition"
+                    >
+                      Si, actualizar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelUpdateConfirmation}
+                      className="rounded-full bg-rose-500 px-4 py-2 text-xs font-bold text-rose-950 hover:brightness-110 transition"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <div className="mx-auto mb-4 flex w-full max-w-3xl flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/15 bg-black/20 px-4 py-3">
               <div>
                 <p className="text-xs font-semibold tracking-[0.14em] uppercase text-white/60">
@@ -689,7 +850,7 @@ export function AdminDashboard() {
               {editingId ? "Cancelar" : "Cerrar"}
             </button>
           </div>
-          <p className="mt-2 text-sm text-white/75">Fotos: 5 a 10</p>
+          <p className="mt-2 text-sm text-white/75">Fotos: sin limite maximo</p>
 
           <form className="mt-6 grid gap-6" onSubmit={handleCreateProfile}>
             {/* Identidad */}
@@ -734,13 +895,41 @@ export function AdminDashboard() {
               </div>
               <div className="grid gap-1.5">
                 <label className="text-xs font-semibold text-white/65">Horario disponible</label>
-                <input
-                  value={form.schedule}
-                  onChange={(event) => setForm((prev) => ({ ...prev, schedule: event.target.value }))}
-                  placeholder="Ej: Disponible de 13:00 a 20:00"
-                  className="rounded-xl border border-white/20 bg-black/20 px-4 py-3 text-sm"
-                  required
-                />
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="grid gap-1.5">
+                    <label className="text-[11px] font-semibold text-white/50">Fecha</label>
+                    <input
+                      value={form.availableDate}
+                      onChange={(event) => setForm((prev) => ({ ...prev, availableDate: event.target.value }))}
+                      type="date"
+                      className="rounded-xl border border-white/20 bg-black/20 px-4 py-3 text-sm"
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <label className="text-[11px] font-semibold text-white/50">Desde</label>
+                    <input
+                      value={form.availableFromTime}
+                      onChange={(event) => setForm((prev) => ({ ...prev, availableFromTime: event.target.value }))}
+                      type="time"
+                      className="rounded-xl border border-white/20 bg-black/20 px-4 py-3 text-sm"
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <label className="text-[11px] font-semibold text-white/50">Hasta</label>
+                    <input
+                      value={form.availableToTime}
+                      onChange={(event) => setForm((prev) => ({ ...prev, availableToTime: event.target.value }))}
+                      type="time"
+                      className="rounded-xl border border-white/20 bg-black/20 px-4 py-3 text-sm"
+                      required
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-white/45">
+                  Se registra como: {createScheduleLabel(form.availableDate, form.availableFromTime, form.availableToTime)}
+                </p>
               </div>
             </div>
 
@@ -751,26 +940,6 @@ export function AdminDashboard() {
               <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-white/40">
                 Presentacion
               </p>
-              <div className="grid gap-1.5">
-                <label className="text-xs font-semibold text-white/65">Tagline</label>
-                <input
-                  value={form.tagline}
-                  onChange={(event) => setForm((prev) => ({ ...prev, tagline: event.target.value }))}
-                  placeholder="Ej: Modelo anfitriona para eventos premium"
-                  className="rounded-xl border border-white/20 bg-black/20 px-4 py-3 text-sm"
-                  required
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <label className="text-xs font-semibold text-white/65">Caracteristicas fisicas</label>
-                <textarea
-                  value={form.physicalTraits}
-                  onChange={(event) => setForm((prev) => ({ ...prev, physicalTraits: event.target.value }))}
-                  placeholder="Describe el estilo, imagen y presencia..."
-                  className="min-h-[72px] rounded-xl border border-white/20 bg-black/20 px-4 py-3 text-sm"
-                  required
-                />
-              </div>
               <div className="grid gap-1.5">
                 <label className="text-xs font-semibold text-white/65">Detalles del servicio</label>
                 <textarea
@@ -852,7 +1021,7 @@ export function AdminDashboard() {
             <div className="grid gap-4">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-white/40">Medios</p>
-                <p className="text-[11px] text-white/40">5–10 fotos · 1–2 videos</p>
+                <p className="text-[11px] text-white/40">Fotos sin limite · 1–2 videos</p>
               </div>
 
               {/* Fotos — entrada unificada */}
@@ -882,7 +1051,7 @@ export function AdminDashboard() {
                       onChange={(event) => void handlePhotoUpload(event)}
                       className="block w-full cursor-pointer rounded-xl border border-dashed border-white/25 bg-white/5 px-4 py-3 text-sm text-white/60 file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-[var(--accent)] file:px-3 file:py-1 file:text-xs file:font-bold file:text-[var(--accent-ink)]"
                     />
-                    <p className="text-xs text-white/35">JPG, PNG, WebP, HEIC y más · máx. 10 fotos</p>
+                    <p className="text-xs text-white/35">JPG, PNG, WebP, HEIC y más · puedes subir muchas fotos</p>
                   </div>
 
                   {photoItems.length > 0 ? (
@@ -913,7 +1082,7 @@ export function AdminDashboard() {
                                 <img
                                   src={photo}
                                   alt={`Vista previa foto ${index + 1}`}
-                                  className="h-24 w-full object-cover"
+                                  className="h-28 w-full object-contain bg-black/35"
                                   loading="lazy"
                                 />
                               </div>
@@ -1065,7 +1234,6 @@ export function AdminDashboard() {
                     <h3 className="truncate font-[var(--font-heading)] text-2xl">
                       {profile.displayName}
                     </h3>
-                    <p className="mt-1 line-clamp-2 text-sm text-white/65">{profile.tagline}</p>
                   </div>
                   <span
                     className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
@@ -1269,6 +1437,9 @@ export function AdminDashboard() {
                 <span className="rounded-full border border-rose-400/25 bg-rose-400/10 px-3 py-1 text-rose-200">
                   {clients.filter((c) => c.status === "rejected").length} rechazados
                 </span>
+                <span className="rounded-full border border-sky-400/25 bg-sky-400/10 px-3 py-1 text-sky-200">
+                  {clients.reduce((total, client) => total + client.pendingConsumptionValidations, 0)} consumos por validar
+                </span>
               </div>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -1332,6 +1503,41 @@ export function AdminDashboard() {
                         >
                           Cambiar clave
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleApprovePendingConsumption(client.id)}
+                          disabled={client.pendingConsumptionValidations === 0}
+                          className="rounded-full border border-emerald-300/35 bg-emerald-500/10 px-4 py-2 text-xs font-semibold text-emerald-200 disabled:opacity-40"
+                        >
+                          Validar consumo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleRejectPendingConsumption(client.id)}
+                          disabled={client.pendingConsumptionValidations === 0}
+                          className="rounded-full border border-rose-300/35 bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-200 disabled:opacity-40"
+                        >
+                          Rechazar consumo
+                        </button>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+                        <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+                          <p className="text-white/45">Consumos</p>
+                          <p className="text-sm font-bold text-white">{client.totalConsumptions}</p>
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+                          <p className="text-white/45">Puntos</p>
+                          <p className="text-sm font-bold text-white">{client.loyaltyPoints}</p>
+                        </div>
+                        <div className="rounded-lg border border-amber-300/20 bg-amber-500/10 px-2 py-1.5">
+                          <p className="text-amber-200/70">Gratis</p>
+                          <p className="text-sm font-bold text-amber-200">{client.freeServicesAvailable}</p>
+                        </div>
+                        <div className="rounded-lg border border-sky-300/20 bg-sky-500/10 px-2 py-1.5">
+                          <p className="text-sky-200/70">Por validar</p>
+                          <p className="text-sm font-bold text-sky-200">{client.pendingConsumptionValidations}</p>
+                        </div>
                       </div>
 
                       {resetPwdClientId === client.id ? (

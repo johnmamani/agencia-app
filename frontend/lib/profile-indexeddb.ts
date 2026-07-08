@@ -21,8 +21,8 @@ function normalizeVideos(values: string[]): string[] {
 }
 
 function assertMediaRules(photos: string[]): void {
-  if (photos.length < 5 || photos.length > 10) {
-    throw new Error("Cada perfil necesita entre 5 y 10 fotos.");
+  if (photos.length < 1) {
+    throw new Error("Cada perfil necesita al menos 1 foto.");
   }
 }
 
@@ -58,8 +58,6 @@ function getInitialProfile(): Profile {
     age: 22,
     nationality: "Peruana",
     schedule: "Disponible de 13:00 a 20:00",
-    tagline: "Modelo anfitriona para eventos premium",
-    physicalTraits: "Estilo elegante, imagen editorial, presencia social.",
     serviceDetails: "Acompanamiento legal para cenas, eventos privados y actividades sociales.",
     treatmentStyle: "Trato cordial, puntual y con protocolo profesional.",
     costText: "Desde S/ 450 por bloque de 2 horas.",
@@ -176,8 +174,6 @@ export async function createProfile(input: CreateProfileInput): Promise<Profile>
     age: normalizeAge(input.age),
     nationality: normalizeNationality(input.nationality),
     schedule: input.schedule?.trim() || "Disponible de 13:00 a 20:00",
-    tagline: input.tagline.trim(),
-    physicalTraits: input.physicalTraits.trim(),
     serviceDetails: input.serviceDetails.trim(),
     treatmentStyle: input.treatmentStyle.trim(),
     costText: input.costText.trim(),
@@ -241,8 +237,6 @@ export async function updateProfile(id: string, input: UpdateProfileInput): Prom
     age: input.age !== undefined ? normalizeAge(input.age) : profile.age,
     nationality: input.nationality !== undefined ? normalizeNationality(input.nationality) : profile.nationality,
     schedule: input.schedule?.trim() || profile.schedule,
-    tagline: input.tagline?.trim() ?? profile.tagline,
-    physicalTraits: input.physicalTraits?.trim() ?? profile.physicalTraits,
     serviceDetails: input.serviceDetails?.trim() ?? profile.serviceDetails,
     treatmentStyle: input.treatmentStyle?.trim() ?? profile.treatmentStyle,
     costText: input.costText?.trim() ?? profile.costText,

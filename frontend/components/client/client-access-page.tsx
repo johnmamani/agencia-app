@@ -8,8 +8,6 @@ import { getActiveProfile } from "@/frontend/lib/profile-indexeddb";
 import {
   ADMIN_EMAIL,
   ADMIN_PASSWORD,
-  DEMO_ADMIN_EMAIL,
-  DEMO_ADMIN_PASSWORD,
   clearSession,
   isAdminCredential,
   readSession,
@@ -49,14 +47,6 @@ export function ClientAccessPage() {
       const [activeProfile, persistedSession] = await Promise.all([getActiveProfile(), Promise.resolve(readSession())]);
       setProfile(activeProfile);
       setSession(persistedSession);
-
-    if (persistedSession?.role === "admin") {
-        setActiveTab("admin");
-        setSelectedRole("admin");
-      } else if (persistedSession?.role === "client") {
-        setSelectedRole("client");
-        setActiveTab("login");
-      }
 
       setLoading(false);
     }
@@ -184,13 +174,6 @@ export function ClientAccessPage() {
     clearSession();
     setSession(null);
     setMessage("Sesion cerrada.");
-  }
-
-  function useDemoCredentials() {
-    setActiveTab("admin");
-    setError("");
-    setMessage("Credenciales demo admin cargadas. Ahora pulsa Ingresar como admin.");
-    setAdminForm({ email: DEMO_ADMIN_EMAIL, password: DEMO_ADMIN_PASSWORD });
   }
 
   function useAdminCredentials() {
@@ -322,17 +305,36 @@ export function ClientAccessPage() {
               </div>
               <div className="grid gap-1.5">
                 <label className="text-xs font-semibold text-white/60">Clave</label>
-                <div className="flex gap-2">
+                <div className="relative">
                   <input
                     value={registerForm.password}
                     onChange={(e) => setRegisterForm((p) => ({ ...p, password: e.target.value }))}
                     placeholder="Minimo 4 caracteres"
                     type={showRegisterPassword ? "text" : "password"}
-                    className="flex-1 rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm outline-none focus:border-white/40"
+                    className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 pr-12 text-sm outline-none focus:border-white/40"
                     required
                   />
-                  <button type="button" onClick={() => setShowRegisterPassword((p) => !p)} className="rounded-xl border border-white/20 bg-white/5 px-3 text-xs font-semibold">
-                    {showRegisterPassword ? "Ocultar" : "Ver"}
+                  <button
+                    type="button"
+                    onClick={() => setShowRegisterPassword((p) => !p)}
+                    aria-label={showRegisterPassword ? "Ocultar clave" : "Mostrar clave"}
+                    className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-white/60 transition hover:text-white"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5 fill-none stroke-current" strokeWidth="1.8" aria-hidden="true">
+                      {showRegisterPassword ? (
+                        <>
+                          <path d="M3 3l18 18" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M10.58 10.58a2 2 0 0 0 2.84 2.84" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M9.36 5.47A10.83 10.83 0 0 1 12 5c5 0 8.27 3.11 9.53 5.22a1.52 1.52 0 0 1 0 1.56 13.17 13.17 0 0 1-4.16 4.36" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M6.23 6.23A13.22 13.22 0 0 0 2.47 10.22a1.52 1.52 0 0 0 0 1.56C3.73 13.89 7 17 12 17c1.26 0 2.4-.2 3.42-.53" strokeLinecap="round" strokeLinejoin="round" />
+                        </>
+                      ) : (
+                        <>
+                          <path d="M2.47 10.22C3.73 8.11 7 5 12 5s8.27 3.11 9.53 5.22a1.52 1.52 0 0 1 0 1.56C20.27 13.89 17 17 12 17s-8.27-3.11-9.53-5.22a1.52 1.52 0 0 1 0-1.56Z" strokeLinecap="round" strokeLinejoin="round" />
+                          <circle cx="12" cy="11" r="3" />
+                        </>
+                      )}
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -359,17 +361,36 @@ export function ClientAccessPage() {
               </div>
               <div className="grid gap-1.5">
                 <label className="text-xs font-semibold text-white/60">Clave</label>
-                <div className="flex gap-2">
+                <div className="relative">
                   <input
                     value={loginForm.password}
                     onChange={(e) => setLoginForm((p) => ({ ...p, password: e.target.value }))}
                     placeholder="Tu clave"
                     type={showLoginPassword ? "text" : "password"}
-                    className="flex-1 rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm outline-none focus:border-white/40"
+                    className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 pr-12 text-sm outline-none focus:border-white/40"
                     required
                   />
-                  <button type="button" onClick={() => setShowLoginPassword((p) => !p)} className="rounded-xl border border-white/20 bg-white/5 px-3 text-xs font-semibold">
-                    {showLoginPassword ? "Ocultar" : "Ver"}
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword((p) => !p)}
+                    aria-label={showLoginPassword ? "Ocultar clave" : "Mostrar clave"}
+                    className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-white/60 transition hover:text-white"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5 fill-none stroke-current" strokeWidth="1.8" aria-hidden="true">
+                      {showLoginPassword ? (
+                        <>
+                          <path d="M3 3l18 18" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M10.58 10.58a2 2 0 0 0 2.84 2.84" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M9.36 5.47A10.83 10.83 0 0 1 12 5c5 0 8.27 3.11 9.53 5.22a1.52 1.52 0 0 1 0 1.56 13.17 13.17 0 0 1-4.16 4.36" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M6.23 6.23A13.22 13.22 0 0 0 2.47 10.22a1.52 1.52 0 0 0 0 1.56C3.73 13.89 7 17 12 17c1.26 0 2.4-.2 3.42-.53" strokeLinecap="round" strokeLinejoin="round" />
+                        </>
+                      ) : (
+                        <>
+                          <path d="M2.47 10.22C3.73 8.11 7 5 12 5s8.27 3.11 9.53 5.22a1.52 1.52 0 0 1 0 1.56C20.27 13.89 17 17 12 17s-8.27-3.11-9.53-5.22a1.52 1.52 0 0 1 0-1.56Z" strokeLinecap="round" strokeLinejoin="round" />
+                          <circle cx="12" cy="11" r="3" />
+                        </>
+                      )}
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -396,17 +417,36 @@ export function ClientAccessPage() {
               </div>
               <div className="grid gap-1.5">
                 <label className="text-xs font-semibold text-white/60">Clave</label>
-                <div className="flex gap-2">
+                <div className="relative">
                   <input
                     value={adminForm.password}
                     onChange={(e) => setAdminForm((p) => ({ ...p, password: e.target.value }))}
                     placeholder="Clave de administrador"
                     type={showAdminPassword ? "text" : "password"}
-                    className="flex-1 rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm outline-none focus:border-white/40"
+                    className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 pr-12 text-sm outline-none focus:border-white/40"
                     required
                   />
-                  <button type="button" onClick={() => setShowAdminPassword((p) => !p)} className="rounded-xl border border-white/20 bg-white/5 px-3 text-xs font-semibold">
-                    {showAdminPassword ? "Ocultar" : "Ver"}
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPassword((p) => !p)}
+                    aria-label={showAdminPassword ? "Ocultar clave" : "Mostrar clave"}
+                    className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-white/60 transition hover:text-white"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5 fill-none stroke-current" strokeWidth="1.8" aria-hidden="true">
+                      {showAdminPassword ? (
+                        <>
+                          <path d="M3 3l18 18" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M10.58 10.58a2 2 0 0 0 2.84 2.84" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M9.36 5.47A10.83 10.83 0 0 1 12 5c5 0 8.27 3.11 9.53 5.22a1.52 1.52 0 0 1 0 1.56 13.17 13.17 0 0 1-4.16 4.36" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M6.23 6.23A13.22 13.22 0 0 0 2.47 10.22a1.52 1.52 0 0 0 0 1.56C3.73 13.89 7 17 12 17c1.26 0 2.4-.2 3.42-.53" strokeLinecap="round" strokeLinejoin="round" />
+                        </>
+                      ) : (
+                        <>
+                          <path d="M2.47 10.22C3.73 8.11 7 5 12 5s8.27 3.11 9.53 5.22a1.52 1.52 0 0 1 0 1.56C20.27 13.89 17 17 12 17s-8.27-3.11-9.53-5.22a1.52 1.52 0 0 1 0-1.56Z" strokeLinecap="round" strokeLinejoin="round" />
+                          <circle cx="12" cy="11" r="3" />
+                        </>
+                      )}
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -418,7 +458,6 @@ export function ClientAccessPage() {
                 {isSubmittingAdmin ? "Validando..." : "Ingresar"}
               </button>
               <div className="mt-1 flex flex-wrap gap-2">
-                <button type="button" onClick={useDemoCredentials} className="rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold hover:bg-white/10 transition">Demo admin</button>
                 <button type="button" onClick={useAdminCredentials} className="rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold hover:bg-white/10 transition">Admin principal</button>
               </div>
             </form>

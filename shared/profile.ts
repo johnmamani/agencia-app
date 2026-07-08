@@ -4,8 +4,6 @@ export type Profile = {
   age: number;
   nationality: string;
   schedule: string;
-  tagline: string;
-  physicalTraits: string;
   serviceDetails: string;
   treatmentStyle: string;
   costText: string;
@@ -25,8 +23,6 @@ export type CreateProfileInput = {
   age: number;
   nationality: string;
   schedule?: string;
-  tagline: string;
-  physicalTraits: string;
   serviceDetails: string;
   treatmentStyle: string;
   costText: string;

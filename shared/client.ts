@@ -7,6 +7,12 @@ export type Client = {
   phone: string;
   password: string;
   status: ClientStatus;
+  totalConsumptions: number;
+  loyaltyPoints: number;
+  freeServicesAvailable: number;
+  pendingConsumptionValidations: number;
+  lastConsumptionAt: string | null;
+  lastConsumptionRequestAt: string | null;
   createdAt: string;
   updatedAt: string;
 };

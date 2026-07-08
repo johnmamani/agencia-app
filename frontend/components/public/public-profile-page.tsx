@@ -82,6 +82,21 @@ function getFlagFromNationality(nationality: string): string {
   return "🌎";
 }
 
+function formatScheduleDisplay(value: string): string {
+  const normalized = value.trim();
+  if (!normalized) {
+    return "Sin horario";
+  }
+
+  const rangeMatch = normalized.match(/(\d{2})\/(\d{2})\/(\d{4}).*?de\s+(\d{2}:\d{2})\s+a\s+(\d{2}:\d{2})/i);
+  if (rangeMatch) {
+    const [, day, month, year, fromTime, toTime] = rangeMatch;
+    return `${day}/${month}/${year} de ${fromTime} a ${toTime}`;
+  }
+
+  return normalized.replace(/^disponible\s*/i, "").trim();
+}
+
 export function PublicProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -492,7 +507,7 @@ export function PublicProfilePage() {
                       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/55">
                         Disponibilidad
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-white/90">{profile.schedule}</p>
+                      <p className="mt-1 text-sm font-semibold text-white/90">{formatScheduleDisplay(profile.schedule)}</p>
                     </div>
 
                     <div className="w-fit max-w-full rounded-2xl border border-[#25D366]/45 bg-[#25D366]/15 px-3 py-2.5 backdrop-blur">
@@ -583,10 +598,7 @@ export function PublicProfilePage() {
 
       {profile ? (
         <section id="galeria" className="mt-12 animate-fade-in-up">
-          <div className="mt-0 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border border-white/15 p-5 hover:border-white/30 transition">
-              <p className="leading-7 text-white/85">{profile.physicalTraits}</p>
-            </div>
+          <div className="mt-0 grid gap-4">
             <div className="rounded-2xl border border-white/15 p-5 hover:border-white/30 transition">
               <p className="leading-7 text-white/85">{profile.treatmentStyle}</p>
             </div>

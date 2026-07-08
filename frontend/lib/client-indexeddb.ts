@@ -3,6 +3,21 @@ import type { Client, CreateClientInput, UpdateClientInput } from "@/shared/clie
 const DB_NAME = "agencia-aurora-clients-db";
 const STORE_NAME = "clients";
 const DB_VERSION = 1;
+const LOYALTY_CYCLE = 5;
+
+function normalizeClient(client: Client): Client {
+  return {
+    ...client,
+    totalConsumptions: Number.isFinite(client.totalConsumptions) ? client.totalConsumptions : 0,
+    loyaltyPoints: Number.isFinite(client.loyaltyPoints) ? client.loyaltyPoints : 0,
+    freeServicesAvailable: Number.isFinite(client.freeServicesAvailable) ? client.freeServicesAvailable : 0,
+    pendingConsumptionValidations: Number.isFinite(client.pendingConsumptionValidations)
+      ? client.pendingConsumptionValidations
+      : 0,
+    lastConsumptionAt: client.lastConsumptionAt ?? null,
+    lastConsumptionRequestAt: client.lastConsumptionRequestAt ?? null,
+  };
+}
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -73,6 +88,12 @@ function getSeedClient(): Client {
     phone: "51999999998",
     password: "Demo1234",
     status: "approved",
+    totalConsumptions: 0,
+    loyaltyPoints: 0,
+    freeServicesAvailable: 0,
+    pendingConsumptionValidations: 0,
+    lastConsumptionAt: null,
+    lastConsumptionRequestAt: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -89,12 +110,14 @@ async function ensureSeeded(): Promise<void> {
   } else if (existingDemo.password !== "Demo1234" || existingDemo.status !== "approved") {
     await requestResult(
       store.put({
-        ...existingDemo,
+        ...normalizeClient(existingDemo),
         password: "Demo1234",
         status: "approved",
         updatedAt: new Date().toISOString(),
       }),
     );
+  } else {
+    await requestResult(store.put(normalizeClient(existingDemo)));
   }
 
   await new Promise<void>((resolve, reject) => {
@@ -112,7 +135,7 @@ async function ensureSeeded(): Promise<void> {
 export async function listClients(): Promise<Client[]> {
   await ensureSeeded();
   const { database, transaction, store } = await getStore("readonly");
-  const clients = await requestResult(store.getAll());
+  const clients = (await requestResult(store.getAll())).map((client) => normalizeClient(client));
 
   await new Promise<void>((resolve, reject) => {
     transaction.oncomplete = () => {
@@ -128,6 +151,12 @@ export async function listClients(): Promise<Client[]> {
   return clients.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+export async function getClientByEmail(email: string): Promise<Client | null> {
+  const normalizedEmail = normalizeEmail(email);
+  const clients = await listClients();
+  return clients.find((client) => client.email === normalizedEmail) ?? null;
+}
+
 export async function registerClient(input: CreateClientInput): Promise<Client> {
   assertEmail(input.email);
   assertPassword(input.password);
@@ -140,6 +169,12 @@ export async function registerClient(input: CreateClientInput): Promise<Client> 
     phone: normalizePhone(input.phone),
     password: input.password.trim(),
     status: "pending",
+    totalConsumptions: 0,
+    loyaltyPoints: 0,
+    freeServicesAvailable: 0,
+    pendingConsumptionValidations: 0,
+    lastConsumptionAt: null,
+    lastConsumptionRequestAt: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -169,8 +204,10 @@ export async function updateClient(id: string, input: UpdateClientInput): Promis
     throw new Error("Cliente no encontrado.");
   }
 
+  const normalizedClient = normalizeClient(client);
+
   const updated: Client = {
-    ...client,
+    ...normalizedClient,
     fullName: input.fullName ? normalizeText(input.fullName) : client.fullName,
     email: input.email ? normalizeEmail(input.email) : client.email,
     phone: input.phone ? normalizePhone(input.phone) : client.phone,
@@ -198,6 +235,123 @@ export async function updateClient(id: string, input: UpdateClientInput): Promis
     transaction.onerror = () => {
       database.close();
       reject(transaction.error ?? new Error("No se pudo actualizar el cliente."));
+    };
+  });
+
+  return updated;
+}
+
+export async function registerClientConsumptionByEmail(email: string): Promise<Client> {
+  return requestClientConsumptionValidationByEmail(email);
+}
+
+export async function requestClientConsumptionValidationByEmail(email: string): Promise<Client> {
+  const clients = await listClients();
+  const normalizedEmail = normalizeEmail(email);
+  const client = clients.find((item) => item.email === normalizedEmail);
+
+  if (!client) {
+    throw new Error("Cliente no encontrado.");
+  }
+
+  const now = new Date().toISOString();
+
+  const updated: Client = {
+    ...client,
+    pendingConsumptionValidations: client.pendingConsumptionValidations + 1,
+    lastConsumptionRequestAt: now,
+    updatedAt: now,
+  };
+
+  const { database, transaction, store } = await getStore("readwrite");
+  await requestResult(store.put(updated));
+
+  await new Promise<void>((resolve, reject) => {
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error ?? new Error("No se pudo registrar el consumo del cliente."));
+    };
+  });
+
+  return updated;
+}
+
+export async function approveClientPendingConsumption(id: string): Promise<Client> {
+  const clients = await listClients();
+  const client = clients.find((item) => item.id === id);
+
+  if (!client) {
+    throw new Error("Cliente no encontrado.");
+  }
+
+  if (client.pendingConsumptionValidations <= 0) {
+    throw new Error("Este cliente no tiene consumos pendientes de validacion.");
+  }
+
+  const now = new Date().toISOString();
+  const nextConsumptions = client.totalConsumptions + 1;
+  const unlockedFreeService = nextConsumptions % LOYALTY_CYCLE === 0 ? 1 : 0;
+
+  const updated: Client = {
+    ...client,
+    totalConsumptions: nextConsumptions,
+    loyaltyPoints: client.loyaltyPoints + 1,
+    freeServicesAvailable: client.freeServicesAvailable + unlockedFreeService,
+    pendingConsumptionValidations: client.pendingConsumptionValidations - 1,
+    lastConsumptionAt: now,
+    updatedAt: now,
+  };
+
+  const { database, transaction, store } = await getStore("readwrite");
+  await requestResult(store.put(updated));
+
+  await new Promise<void>((resolve, reject) => {
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error ?? new Error("No se pudo validar el consumo pendiente."));
+    };
+  });
+
+  return updated;
+}
+
+export async function rejectClientPendingConsumption(id: string): Promise<Client> {
+  const clients = await listClients();
+  const client = clients.find((item) => item.id === id);
+
+  if (!client) {
+    throw new Error("Cliente no encontrado.");
+  }
+
+  if (client.pendingConsumptionValidations <= 0) {
+    throw new Error("Este cliente no tiene consumos pendientes de validacion.");
+  }
+
+  const updated: Client = {
+    ...client,
+    pendingConsumptionValidations: client.pendingConsumptionValidations - 1,
+    updatedAt: new Date().toISOString(),
+  };
+
+  const { database, transaction, store } = await getStore("readwrite");
+  await requestResult(store.put(updated));
+
+  await new Promise<void>((resolve, reject) => {
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error ?? new Error("No se pudo rechazar el consumo pendiente."));
     };
   });
 

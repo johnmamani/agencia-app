@@ -27,8 +27,6 @@ const DEFAULT_DB: ProfileDb = {
       age: 22,
       nationality: "Peruana",
       schedule: "Disponible de 13:00 a 20:00",
-      tagline: "Modelo anfitriona para eventos premium",
-      physicalTraits: "Estilo elegante, imagen editorial, presencia social.",
       serviceDetails:
         "Acompanamiento legal para cenas, eventos privados y actividades sociales.",
       treatmentStyle: "Trato cordial, puntual y con protocolo profesional.",
@@ -71,8 +69,8 @@ function cleanLines(values: string[]): string[] {
 }
 
 function assertMediaRules(photos: string[], videos: string[]): void {
-  if (photos.length < 5 || photos.length > 10) {
-    throw new Error("Cada perfil necesita entre 5 y 10 fotos.");
+  if (photos.length < 1) {
+    throw new Error("Cada perfil necesita al menos 1 foto.");
   }
 
   if (videos.length < 1 || videos.length > 2) {
@@ -116,8 +114,6 @@ function mapCreateInput(input: CreateProfileInput): CreateProfileInput {
     age: normalizeAge(input.age),
     nationality: normalizeNationality(input.nationality),
     schedule: input.schedule?.trim() || "Disponible de 13:00 a 20:00",
-    tagline: input.tagline.trim(),
-    physicalTraits: input.physicalTraits.trim(),
     serviceDetails: input.serviceDetails.trim(),
     treatmentStyle: input.treatmentStyle.trim(),
     costText: input.costText.trim(),
