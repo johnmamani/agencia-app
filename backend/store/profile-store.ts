@@ -39,6 +39,7 @@ const DEFAULT_DB: ProfileDb = {
       photos: DEFAULT_PHOTOS,
       videos: ["https://samplelib.com/lib/preview/mp4/sample-5s.mp4"],
       isVisible: true,
+      isLanding: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
@@ -179,6 +180,7 @@ export async function createProfile(input: CreateProfileInput): Promise<Profile>
     ...normalized,
     schedule: normalized.schedule ?? "Disponible de 13:00 a 20:00",
     isVisible: false,
+    isLanding: normalized.isLanding ?? false,
     createdAt: now,
     updatedAt: now,
   };
